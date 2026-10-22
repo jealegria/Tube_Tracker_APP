@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAuthorizedUser() {
+      return isSignedIn() &&
+             request.auth.token.email_verified == true &&
+             (request.auth.token.email == 'hivitro93@gmail.com' ||
+              request.auth.token.email == 'gazzolagrinstein@gmail.com');
+    }
+
+    function isOwner(userId) {
+      return isAuthorizedUser() && request.auth.uid == userId;
+    }
+
+    function isValidProfileId(profileId) {
+      return profileId == 'johnny' || profileId == 'guido';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidProfilePackaging(data, profileId) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.profileId is string && data.profileId == profileId &&
+             data.videoId is string && data.videoId.size() > 0 && data.videoId.size() <= 64 &&
+             data.url is string && data.url.size() <= 500 &&
+             data.title is string && data.title.size() <= 500 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.createdAt is number &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128)) &&
+             (!('channelTitle' in data) || (data.channelTitle is string && data.channelTitle.size() <= 200)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+             (!('favorite' in data) || data.favorite is bool) &&
+             (!('tags' in data) || (
+               data.tags is list &&
+               data.tags.size() <= 50 &&
+               (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() <= 100))
+             ));
+    }
+
+    function isValidProfileConfig(data, profileId) {
+      return data.profileId is string && data.profileId == profileId &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128)) &&
+             (!('categories' in data) || (
+               data.categories is list &&
+               data.categories.size() <= 100 &&
+               (data.categories.size() == 0 || (data.categories[0] is string && data.categories[0].size() <= 100))
+             )) &&
+             (!('tags' in data) || (
+               data.tags is list &&
+               data.tags.size() <= 200 &&
+               (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() <= 100))
+             )) &&
+             (!('defaultChannelName' in data) || (data.defaultChannelName is string && data.defaultChannelName.size() <= 120));
+    }
+
+    match /profiles/{profileId}/packagings/{packagingId} {
+      allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
+      allow create: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(packagingId) &&
+                       incoming().keys().hasAll(['id', 'profileId', 'videoId', 'url', 'title', 'category', 'createdAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'videoId', 'url', 'title', 'channelTitle', 'category', 'tags', 'notes', 'createdAt', 'favorite']) &&
+                       isValidProfilePackaging(incoming(), profileId);
+      allow update: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(packagingId) &&
+                       incoming().id == existing().id &&
+                       incoming().profileId == existing().profileId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasAll(['id', 'profileId', 'videoId', 'url', 'title', 'category', 'createdAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'videoId', 'url', 'title', 'channelTitle', 'category', 'tags', 'notes', 'createdAt', 'favorite']) &&
+                       isValidProfilePackaging(incoming(), profileId);
+      allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && isValidId(packagingId);
+    }
+
+    match /profiles/{profileId}/config/{configId} {
+      allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
+      allow create, update: if isAuthorizedUser() &&
+                               isValidProfileId(profileId) &&
+                               configId == 'preferences' &&
+                               incoming().keys().hasAll(['profileId']) &&
+                               incoming().keys().hasOnly(['profileId', 'userId', 'categories', 'tags', 'defaultChannelName']) &&
+                               isValidProfileConfig(incoming(), profileId);
+      allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && configId == 'preferences';
+    }
+
+    match /users/{userId}/packagings/{packagingId} {
+      allow get, list: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/config/{configId} {
+      allow get, list: if isOwner(userId);
+    }
+
+    match /test/connection {
+      allow get: if isAuthorizedUser();
+    }
+  }
+}

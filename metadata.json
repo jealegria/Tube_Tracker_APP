@@ -1,0 +1,6 @@
+{
+  "name": "TubeSwipe - YouTube Packaging Swipe File",
+  "description": "Guarda y organiza miniaturas y títulos de YouTube para analizar packagings, ideas y formatos.",
+  "requestFramePermissions": ["clipboard-read", "clipboard-write"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "Packaging": {
+      "title": "Packaging",
+      "description": "A YouTube video packaging saved inside a creator profile (johnny or guido)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique packaging identifier"
+        },
+        "profileId": {
+          "type": "string",
+          "description": "The profile identifier (johnny or guido)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who created or updated this item"
+        },
+        "videoId": {
+          "type": "string",
+          "description": "The YouTube video ID"
+        },
+        "url": {
+          "type": "string",
+          "description": "Canonical watch URL of the YouTube video"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the video",
+          "maxLength": 500
+        },
+        "channelTitle": {
+          "type": "string",
+          "description": "Channel name",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Category name",
+          "maxLength": 100
+        },
+        "tags": {
+          "type": "array",
+          "description": "List of tags associated with this packaging"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes on why this packaging works",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "favorite": {
+          "type": "boolean",
+          "description": "Flag indicating if the user starred this item"
+        }
+      },
+      "required": ["id", "profileId", "videoId", "url", "title", "category", "createdAt"]
+    },
+    "ProfileConfig": {
+      "title": "ProfileConfig",
+      "description": "Profile preferences for categories, tags, and default channel name",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "description": "The profile identifier (johnny or guido)"
+        },
+        "categories": {
+          "type": "array",
+          "description": "Custom categories list"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Custom tags list"
+        },
+        "defaultChannelName": {
+          "type": "string",
+          "description": "Default YouTube channel name for this profile when comparing packs",
+          "maxLength": 120
+        }
+      },
+      "required": ["profileId"]
+    }
+  },
+  "firestore": {
+    "/profiles/{profileId}/packagings/{packagingId}": {
+      "schema": "Packaging",
+      "description": "Profile-scoped saved YouTube packagings for Johnny and Guido"
+    },
+    "/profiles/{profileId}/config/preferences": {
+      "schema": "ProfileConfig",
+      "description": "Profile-scoped category, tag, and default channel configuration"
+    }
+  }
+}
