@@ -17,6 +17,7 @@ import {
   Volume2,
   Settings,
   Maximize,
+  Shuffle,
 } from 'lucide-react';
 import { PackagingItem } from '../../types';
 import {
@@ -1069,14 +1070,381 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
   // 4. SMART TV (YouTube Living Room 10-ft UI · Exact 1:1 Match to Reference)
   // ============================================================================
   return (
-    <div className="flex flex-col items-center py-2">
-      {/* Outer TV Monitor Bezel */}
-      <div className="w-full max-w-[1040px] bg-black border-[10px] border-neutral-950 shadow-2xl overflow-hidden select-none text-white">
+    <SmartTVSimulatorView
+      cards={cards}
+      playingCard={playingCard}
+      effectiveChannel={effectiveChannel}
+      placement={placement}
+      userPositionIndex={userPositionIndex}
+      fullscreenCarouselRef={fullscreenCarouselRef}
+      isDraggingCarousel={isDraggingCarousel}
+      handleCarouselMouseDown={handleCarouselMouseDown}
+      handleCarouselMouseMove={handleCarouselMouseMove}
+      stopCarouselDragging={stopCarouselDragging}
+    />
+  );
+};
+
+interface SmartTVSimulatorViewProps {
+  cards: SimCard[];
+  playingCard: SimCard;
+  effectiveChannel: string;
+  placement: ABPlacementMode;
+  userPositionIndex: number;
+  fullscreenCarouselRef: React.RefObject<HTMLDivElement | null>;
+  isDraggingCarousel: boolean;
+  handleCarouselMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
+  handleCarouselMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
+  stopCarouselDragging: () => void;
+}
+
+const SmartTVSimulatorView: React.FC<SmartTVSimulatorViewProps> = ({
+  cards,
+  playingCard,
+  effectiveChannel,
+  placement,
+  userPositionIndex,
+  fullscreenCarouselRef,
+  isDraggingCarousel,
+  handleCarouselMouseDown,
+  handleCarouselMouseMove,
+  stopCarouselDragging,
+}) => {
+  // TV Homepage state: choose whether the user's variation appears in "Recommended shows" (top) or "Continue watching" (bottom)
+  const [tvHomeSection, setTvHomeSection] = React.useState<'recommended' | 'continue'>('recommended');
+
+  // Row state for TV Suggested ("Sugeridos (Viendo un video)"):
+  // 0 = Foto 1: Viendo el video con controles activos y la Fila 1 (3 miniaturas) asomando abajo
+  // 1 = Foto 2: Bajas con el control -> Fila 1 (3 packs) sube y se ve entera + Fila 2 (siguientes 3) asoma abajo
+  // 2 = Foto 3: Bajas de nuevo -> Fila 2 (3 packs) sube y se ve entera + Fila 3 (siguientes 3) asoma abajo
+  // 3 = Fila 3 entera + Fila 4 asomando abajo
+  // 4 = Fila 4 entera + Fila 5 asomando abajo
+  const [tvSuggestedStep, setTvSuggestedStep] = React.useState<number>(0);
+  // Which row (0-indexed: 0 = Fila 1, 1 = Fila 2, 2 = Fila 3) holds the user's A/B variation
+  const [userTargetRow, setUserTargetRow] = React.useState<number>(0);
+
+  // TV Background ("Mirando el video") controls: randomize playing video or set screen to pure black
+  const [isBlackVideoBg, setIsBlackVideoBg] = React.useState<boolean>(false);
+  const [playingBgIndex, setPlayingBgIndex] = React.useState<number>(0);
+
+  const MAX_SUGGESTED_STEP = 4; // Steps 0..4 (with 5 rows of 3 = 15 cards so there is ALWAYS a next row peeking)
+
+  // Build separate non-overlapping lists for TV Homepage: Top ("Recommended shows") and Bottom ("Continue watching")
+  const { tvHomeRecommendedCards, tvHomeContinueCards } = React.useMemo(() => {
+    const userCard = cards.find((c) => c.isUser) || null;
+    const competitorPool = cards.filter((c) => !c.isUser);
+    const fallbackCompetitor: SimCard = {
+      isUser: false,
+      id: 'tv-home-fallback',
+      title: 'Why Indie Games Fail Before Launch',
+      channel: 'Indie Game Clinic',
+      thumbUrl: playingCard.thumbUrl,
+      duration: '14:22',
+      views: '84K',
+      timeAgo: '2w ago',
+    };
+
+    const filled: SimCard[] = [];
+    for (let i = 0; i < 10; i++) {
+      const base =
+        competitorPool.length > 0
+          ? competitorPool[i % competitorPool.length]
+          : fallbackCompetitor;
+      filled.push({
+        ...base,
+        id: `${base.id}-tvhome-${i}`,
+        isUser: false,
+      });
+    }
+
+    const recList = filled.slice(0, 6);
+    const contList = filled.slice(6, 10);
+
+    if (userCard) {
+      if (tvHomeSection === 'recommended') {
+        const pos = userPositionIndex % 2; // 0 or 1 so it is always one of the 2 full cards in Recommended shows
+        recList.splice(pos, 1, userCard);
+      } else {
+        const pos = userPositionIndex % 3; // 0, 1, or 2 so it is always visible in Continue watching
+        contList.splice(pos, 1, userCard);
+      }
+    }
+
+    return {
+      tvHomeRecommendedCards: recList,
+      tvHomeContinueCards: contList,
+    };
+  }, [cards, playingCard.thumbUrl, tvHomeSection, userPositionIndex]);
+
+  // Candidate pool for the currently playing video on TV
+  const playingVideoPool = React.useMemo(() => {
+    const repoCompetitors = cards.filter((c) => !c.isUser);
+    return [playingCard, ...repoCompetitors];
+  }, [playingCard, cards]);
+
+  const activePlayingCard =
+    playingVideoPool[playingBgIndex % playingVideoPool.length] || playingCard;
+
+  const handleRandomizePlayingVideo = () => {
+    setIsBlackVideoBg(false);
+    if (playingVideoPool.length <= 1) return;
+    setPlayingBgIndex((prev) => {
+      const currentIdx = prev % playingVideoPool.length;
+      let nextIdx = Math.floor(Math.random() * playingVideoPool.length);
+      if (nextIdx === currentIdx) {
+        nextIdx = (currentIdx + 1) % playingVideoPool.length;
+      }
+      return nextIdx;
+    });
+  };
+
+  // Build a 15-card array (5 rows of 3 columns) so every step has 3 full packs + 3 peeking packs below
+  const tvSuggestedGridCards = React.useMemo(() => {
+    const userCard = cards.find((c) => c.isUser) || null;
+    const competitorPool = cards.filter(
+      (c) => !c.isUser && c.id !== activePlayingCard.id
+    );
+    const fallbackCompetitor: SimCard = {
+      isUser: false,
+      id: 'tv-comp-fallback',
+      title: 'Why Indie Games Fail Before Launch',
+      channel: 'Indie Game Clinic',
+      thumbUrl: activePlayingCard.thumbUrl,
+      duration: '14:22',
+      views: '84K',
+      timeAgo: '2w ago',
+    };
+
+    const filledCompetitors: SimCard[] = [];
+    for (let i = 0; i < 15; i++) {
+      const base =
+        competitorPool.length > 0
+          ? competitorPool[i % competitorPool.length]
+          : fallbackCompetitor;
+      filledCompetitors.push({
+        ...base,
+        id: `${base.id}-tvslot-${i}`,
+        isUser: false,
+      });
+    }
+
+    if (userCard) {
+      const colInRow = ((userPositionIndex % 3) + 3) % 3;
+      const targetIndex = Math.min(14, userTargetRow * 3 + colInRow);
+      filledCompetitors.splice(targetIndex, 1, userCard);
+    }
+
+    return filledCompetitors.slice(0, 15);
+  }, [cards, activePlayingCard, userPositionIndex, userTargetRow]);
+
+  // Group into 5 rows of 3 cards each
+  const suggestedRows = React.useMemo(() => {
+    const rows: SimCard[][] = [];
+    for (let r = 0; r < 5; r++) {
+      rows.push(tvSuggestedGridCards.slice(r * 3, r * 3 + 3));
+    }
+    return rows;
+  }, [tvSuggestedGridCards]);
+
+  const handleStepNext = React.useCallback(() => {
+    setTvSuggestedStep((prev) => Math.min(MAX_SUGGESTED_STEP, prev + 1));
+  }, []);
+
+  const handleStepPrev = React.useCallback(() => {
+    setTvSuggestedStep((prev) => Math.max(0, prev - 1));
+  }, []);
+
+  // Exact vertical translateY math inside the 560px TV viewport:
+  // - Player Top & Controls Block = 452px tall (so at Step 0, Row 0 starts at y=452px -> top 108px of Row 0's 3 thumbnails peeks at bottom!)
+  // - Each Suggested Row = 168px (16:9 thumb) + 74px (2-line title + channel/views/time) = 242px tall
+  // - Gap between rows = 24px -> Row Step = 266px
+  // - At Step 1 (Fila 1): translateY = -254px -> Row 0 sits at y=198px..440px (100% visible entero!) and Row 1 starts at y=464px (top 96px of next 3 thumbnails peeks at bottom!)
+  // - At Step k (Fila k): translateY = -(254 + (k - 1) * 266)px -> Row (k-1) sits at y=198px..440px (entero) and Row k starts at y=464px (top 96px peeks at bottom!)
+  const trackTranslateY =
+    tvSuggestedStep === 0 ? 0 : -(254 + (tvSuggestedStep - 1) * 266);
+
+  return (
+    <div className="flex flex-col items-center py-2 space-y-3">
+      {/* TV Homepage Section Selector Bar (Choose between Recommended shows vs Continue watching) */}
+      {placement === 'home' && (
+        <div className="w-full max-w-[1040px] rounded-2xl border border-neutral-800 bg-neutral-900/90 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-200 shadow-lg">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-red-400">
+              Ubicación de tu pack en TV Homepage:
+            </span>
+
+            <div className="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setTvHomeSection('recommended')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  tvHomeSection === 'recommended'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Recommended shows (Fila 1)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTvHomeSection('continue')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  tvHomeSection === 'continue'
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Continue watching (Fila 2)
+              </button>
+            </div>
+          </div>
+
+          <span className="text-[11px] text-neutral-400">
+            {tvHomeSection === 'recommended'
+              ? 'Tu variación se muestra en la fila 1 (Recommended shows)'
+              : 'Tu variación se muestra en la fila 2 (Continue watching)'}
+          </span>
+        </div>
+      )}
+
+      {/* Interactive TV Remote Control Bar (Only in Sugeridos / Watch mode) */}
+      {placement !== 'home' && (
+        <div className="w-full max-w-[1040px] rounded-2xl border border-neutral-800 bg-neutral-900/90 px-4 py-2.5 flex flex-col gap-2.5 text-xs text-neutral-200 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-red-400">
+                Control Remoto TV:
+              </span>
+
+              <button
+                type="button"
+                onClick={handleStepPrev}
+                disabled={tvSuggestedStep === 0}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                  tvSuggestedStep === 0
+                    ? 'border-neutral-800 bg-neutral-950/50 text-neutral-600 cursor-not-allowed'
+                    : 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer'
+                }`}
+                title="Subir una fila"
+              >
+                <span>&#9650; / &#9664; Subir</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleStepNext}
+                disabled={tvSuggestedStep === MAX_SUGGESTED_STEP}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm ${
+                  tvSuggestedStep === MAX_SUGGESTED_STEP
+                    ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-500 text-white cursor-pointer'
+                }`}
+                title="Bajar una fila en la cuadrícula de 3"
+              >
+                <span>&#9660; / &#9654; Bajar fila (Ver siguientes 3)</span>
+              </button>
+
+              {/* Step Pills */}
+              <div className="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-800">
+                {[
+                  { step: 0, label: '1. Video' },
+                  { step: 1, label: '2. Fila 1' },
+                  { step: 2, label: '3. Fila 2' },
+                  { step: 3, label: '4. Fila 3' },
+                ].map((item) => (
+                  <button
+                    key={item.step}
+                    type="button"
+                    onClick={() => setTvSuggestedStep(item.step)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                      tvSuggestedStep === item.step
+                        ? 'bg-white text-black shadow-sm'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Choose which row holds the user's variation pack */}
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-neutral-400 font-medium">Tu pack en:</span>
+              {[0, 1, 2].map((rIdx) => (
+                <button
+                  key={rIdx}
+                  type="button"
+                  onClick={() => {
+                    setUserTargetRow(rIdx);
+                  }}
+                  className={`px-2 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                    userTargetRow === rIdx
+                      ? 'bg-red-600/20 text-red-400 border border-red-500/40'
+                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Fila {rIdx + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 2 of TV Controls: Video Background ("Mirando el video") Randomize or Black Screen */}
+          <div className="pt-2 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-neutral-400 font-medium">
+                Pantalla del video en reproducción:
+              </span>
+
+              <button
+                type="button"
+                onClick={handleRandomizePlayingVideo}
+                className="px-2.5 py-1 rounded-lg border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Cambiar aleatoriamente el video que se está viendo en el fondo de la TV"
+              >
+                <Shuffle className="w-3 h-3" />
+                <span>Randomizar video de fondo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsBlackVideoBg((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-lg border font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isBlackVideoBg
+                    ? 'bg-white text-black border-white shadow-sm'
+                    : 'border-neutral-700 bg-neutral-950 text-neutral-300 hover:text-white hover:border-neutral-600'
+                }`}
+                title="Dejar el fondo del reproductor completamente en negro"
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full border ${
+                    isBlackVideoBg
+                      ? 'bg-black border-black'
+                      : 'bg-black border-neutral-500'
+                  }`}
+                />
+                <span>{isBlackVideoBg ? 'Fondo negro (Activo)' : 'Dejar en negro'}</span>
+              </button>
+            </div>
+
+            <span className="text-neutral-500 truncate max-w-sm">
+              {isBlackVideoBg
+                ? 'Fondo: Pantalla en negro'
+                : `Viendo: ${activePlayingCard.title}`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Outer TV Monitor Bezel (Same neutral-800 frame color as Mobile and Tablet) */}
+      <div className="w-full max-w-[1040px] bg-black rounded-[18px] border-[6px] border-neutral-800 shadow-2xl overflow-hidden select-none text-white">
         {placement === 'home' ? (
           /* SMART TV HOME PAGE (Left Icon Rail + Search/Premium Header + 2.3-Card Main Shelf + Cropped Bottom "Continue watching" Row) */
           <div className="flex h-[560px] bg-[#0f0f0f] overflow-hidden">
             {/* Left Narrow TV Icon Rail */}
-            <div className="w-14 shrink-0 flex flex-col items-center justify-between py-5 bg-[#0f0f0f]">
+            <div className="w-16 shrink-0 flex flex-col items-center justify-between py-5 bg-[#0f0f0f] z-10">
               {/* Top User Avatar */}
               <div className="w-7 h-7 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center uppercase ring-2 ring-white/20">
                 {effectiveChannel.charAt(0)}
@@ -1098,9 +1466,9 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
               <Settings className="w-4 h-4 text-neutral-500" />
             </div>
 
-            {/* Right Main TV Content Area */}
-            <div className="flex-1 min-w-0 flex flex-col justify-between pt-4 pl-2 pr-0 overflow-hidden">
-              {/* Top Bar: Mic + Search Pill + Mute Bell + YouTube Premium */}
+            {/* Right Main TV Content Area (pl-4 ensures the first pack is never clipped by the left sidebar) */}
+            <div className="flex-1 min-w-0 flex flex-col justify-between pt-5 pl-4 pr-0 overflow-hidden">
+              {/* Top Bar: Mic + Search Pill + YouTube Premium */}
               <div className="pr-8 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-[#272727] flex items-center justify-center text-white">
@@ -1108,10 +1476,6 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
                   </div>
                   <div className="w-64 h-8 rounded-full bg-[#272727] px-4 flex items-center text-[13px] font-medium text-neutral-200">
                     Search
-                  </div>
-                  {/* Mute bell icon seen in TV top bar */}
-                  <div className="ml-6 text-neutral-300 opacity-80">
-                    <Bell className="w-4 h-4" />
                   </div>
                 </div>
 
@@ -1126,9 +1490,9 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
                 </div>
               </div>
 
-              {/* Shelf 1: Recommended (2 full large cards + ~1/3 of 3rd card peeking on right, draggable with mouse) */}
-              <div className="mt-3">
-                <div className="text-[12px] font-semibold text-neutral-300 mb-2">
+              {/* Shelf 1: Recommended (2 full large cards + ~1/3 of 3rd card peeking on right, draggable with mouse, NO white rings) */}
+              <div className="mt-4">
+                <div className="text-[12px] font-semibold text-neutral-300 mb-2.5">
                   Recommended shows
                 </div>
 
@@ -1142,69 +1506,58 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
                     isDraggingCarousel ? 'cursor-grabbing' : 'cursor-grab'
                   }`}
                 >
-                  {cards.slice(0, 6).map((card, idx) => {
-                    const isFocused = card.isUser || idx === 0;
-                    return (
-                      <div
-                        key={card.id}
-                        className="w-[390px] shrink-0 flex flex-col select-none"
-                      >
-                        <div
-                          className={`relative aspect-video w-full rounded-[14px] overflow-hidden bg-neutral-900 ${
-                            card.isUser
-                              ? 'ring-[3px] ring-white shadow-xl'
-                              : isFocused
-                              ? 'ring-[2px] ring-white/80'
-                              : ''
-                          }`}
-                        >
-                          <img
-                            src={card.thumbUrl}
-                            alt={card.title}
-                            draggable={false}
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              if (card.fallbackThumbUrl) {
-                                (e.target as HTMLImageElement).src = card.fallbackThumbUrl;
-                              }
-                            }}
-                            className="w-full h-full object-cover pointer-events-none select-none"
-                          />
-                          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-white text-[11px] font-semibold tabular-nums">
-                            {card.duration}
-                          </div>
-                        </div>
-
-                        <div className="mt-2.5 pr-2 space-y-0.5">
-                          <h3
-                            className="text-[15px] leading-[19px] font-bold text-white line-clamp-2"
-                            style={{ maxWidth: '26ch' }}
-                          >
-                            {card.title}
-                          </h3>
-                          <div className="text-[11px] leading-[15px] text-neutral-400 truncate">
-                            {card.channel} · {card.views} views · {card.timeAgo}
-                          </div>
-                          <div className="text-[11px] leading-[14px] text-neutral-500 truncate">
-                            {card.channel}
-                          </div>
+                  {tvHomeRecommendedCards.map((card) => (
+                    <div
+                      key={card.id}
+                      className="w-[390px] shrink-0 flex flex-col select-none"
+                    >
+                      <div className="relative aspect-video w-full rounded-[14px] overflow-hidden bg-neutral-900">
+                        <img
+                          src={card.thumbUrl}
+                          alt={card.title}
+                          draggable={false}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            if (card.fallbackThumbUrl) {
+                              (e.target as HTMLImageElement).src = card.fallbackThumbUrl;
+                            }
+                          }}
+                          className="w-full h-full object-cover pointer-events-none select-none"
+                        />
+                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-white text-[11px] font-semibold tabular-nums">
+                          {card.duration}
                         </div>
                       </div>
-                    );
-                  })}
+
+                      <div className="mt-2.5 pr-2 space-y-0.5">
+                        <h3
+                          className="text-[15px] leading-[19px] font-bold text-white line-clamp-2"
+                          style={{ maxWidth: '26ch' }}
+                        >
+                          {card.title}
+                        </h3>
+                        <div className="text-[11px] leading-[15px] text-neutral-400 truncate">
+                          {card.channel} · {card.views} views · {card.timeAgo}
+                        </div>
+                        <div className="text-[11px] leading-[14px] text-neutral-500 truncate">
+                          {card.channel}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Shelf 2: "Continue watching" Bottom Row (Cut off at ~55% height by bottom TV bezel, no titles visible) */}
-              <div className="mt-2">
+              {/* Shelf 2: "Continue watching" Bottom Row (Shows 35% of the 160px thumbnail height -> h-[56px] at the bottom edge of the TV) */}
+              <div className="mt-3">
                 <div className="text-[12px] font-semibold text-neutral-300 mb-2">
                   Continue watching
                 </div>
                 <div className="flex items-start gap-3.5 overflow-hidden">
-                  {cards.slice(2, 6).map((card) => (
+                  {tvHomeContinueCards.map((card) => (
                     <div
                       key={`cw-${card.id}`}
-                      className="w-[285px] h-[92px] shrink-0 rounded-t-[12px] overflow-hidden bg-neutral-900 relative"
+                      className="w-[285px] h-[56px] shrink-0 rounded-t-[12px] overflow-hidden bg-neutral-900 relative"
                     >
                       <img
                         src={card.thumbUrl}
@@ -1225,142 +1578,203 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
             </div>
           </div>
         ) : (
-          /* SMART TV SUGGESTED (Viendo un video · Playing Video + Player Controls + 3 Bottom Thumbnails Strip with NO titles) */
-          <div className="relative h-[560px] bg-black flex flex-col justify-between overflow-hidden">
-            {/* Full-screen Currently Playing Video Frame */}
-            {playingCard.thumbUrl && (
+          /* SMART TV SUGGESTED (Viendo un video · 3-Column Vertical Grid that slides up row-by-row via buttons) */
+          <div className="relative h-[560px] bg-black overflow-hidden">
+            {/* Full-screen Currently Playing Video Frame in Background (hidden if user selected Black Screen) */}
+            {!isBlackVideoBg && activePlayingCard.thumbUrl && (
               <img
-                src={playingCard.thumbUrl}
-                alt={playingCard.title}
+                src={activePlayingCard.thumbUrl}
+                alt={activePlayingCard.title}
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  if (activePlayingCard.fallbackThumbUrl) {
+                    (e.target as HTMLImageElement).src = activePlayingCard.fallbackThumbUrl;
+                  }
+                }}
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}
-            {/* Subtle top and bottom vignette scrims */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-transparent to-black/90" />
 
-            {/* Top Overlay: Playing Video Title & Channel Metadata on Left + Mute Bell in Center */}
-            <div className="relative z-10 pt-7 px-10 flex items-start justify-between">
-              <div className="max-w-md space-y-1">
-                <h2 className="text-[20px] leading-[25px] font-bold text-white drop-shadow-md line-clamp-2">
-                  {playingCard.title}
-                </h2>
-                <div className="text-[11px] font-medium text-neutral-200 drop-shadow">
-                  {playingCard.channel} · {playingCard.views} views · {playingCard.timeAgo}
+            {/* Dynamic Scrim: Darker when navigating the Suggested Grid rows (Foto 2 & Foto 3) so pack titles pop */}
+            <div
+              className={`absolute inset-0 transition-colors duration-300 ${
+                isBlackVideoBg
+                  ? 'bg-black'
+                  : tvSuggestedStep === 0
+                  ? 'bg-gradient-to-b from-black/65 via-black/15 to-black/90'
+                  : 'bg-black/75'
+              }`}
+            />
+
+            {/* Vertically Sliding Track containing Player Controls + 5 Rows of 3-Column Suggested Packs */}
+            <div
+              className="relative z-10 px-10 transition-transform duration-300 ease-out"
+              style={{ transform: `translateY(${trackTranslateY}px)` }}
+            >
+              {/* PART 1: Video Player Info & Controls Block (Exact 452px height -> Row 1 starts at y=452px) */}
+              <div className="h-[452px] flex flex-col justify-between pt-7 pb-4">
+                {/* Top Overlay: Playing Video Title & Channel Metadata on Left (No floating bell icon) */}
+                <div className="flex items-start justify-between">
+                  <div className="max-w-md space-y-1">
+                    <h2 className="text-[20px] leading-[25px] font-bold text-white drop-shadow-md line-clamp-2">
+                      {activePlayingCard.title}
+                    </h2>
+                    <div className="text-[11px] font-medium text-neutral-200 drop-shadow">
+                      {activePlayingCard.channel} · {activePlayingCard.views} views ·{' '}
+                      {activePlayingCard.timeAgo}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lower Player Scrubber + Three-Zone TV Player Controls */}
+                <div className="space-y-3.5">
+                  {/* Timestamps + Scrubber Line */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-white tabular-nums">
+                      <span>0:08</span>
+                      <span>{activePlayingCard.duration}</span>
+                    </div>
+                    <div className="relative h-1 w-full rounded-full bg-white/30">
+                      <div className="absolute left-0 top-0 bottom-0 w-[12%] rounded-full bg-white" />
+                      <div className="absolute left-[12%] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow" />
+                    </div>
+                  </div>
+
+                  {/* Three-Zone TV Player Controls Row */}
+                  <div className="flex items-center justify-between">
+                    {/* Left: Channel Avatar + Description Pill + Bell */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs font-bold uppercase">
+                        {activePlayingCard.channel.charAt(0)}
+                      </div>
+                      <div className="px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-[11px] font-semibold text-white">
+                        Description
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                        <Bell className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+
+                    {/* Center: Prev + Play + Next */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs">
+                        &#9198;
+                      </div>
+                      <div
+                        onClick={() => setTvSuggestedStep(0)}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-colors ${
+                          tvSuggestedStep === 0
+                            ? 'bg-white text-black'
+                            : 'bg-white/25 text-white hover:bg-white/40'
+                        }`}
+                      >
+                        <Play
+                          className={`w-4 h-4 ml-0.5 ${
+                            tvSuggestedStep === 0 ? 'fill-black' : 'fill-white'
+                          }`}
+                        />
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs">
+                        &#9197;
+                      </div>
+                    </div>
+
+                    {/* Right: Like, Dislike, Share, Maximize, Settings */}
+                    <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center">
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center">
+                        <ThumbsUp className="w-3.5 h-3.5 rotate-180" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center">
+                        <Share2 className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center">
+                        <Maximize className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center">
+                        <Settings className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/90">
-                <Bell className="w-4 h-4" />
-              </div>
-              <div className="w-20" />
-            </div>
+              {/* PART 2: 3-Column Suggested Videos Grid (Each Row = 242px tall + 24px mb = 266px step) */}
+              <div>
+                {suggestedRows.map((rowCards, rowIndex) => {
+                  const isPeekingRow = tvSuggestedStep === rowIndex;
 
-            {/* Bottom Overlay: Progress Bar + Player Control Buttons + 3-Thumbnail Suggested Strip (No titles) */}
-            <div className="relative z-10 px-10 space-y-3.5">
-              {/* Timestamps + Scrubber Line */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-bold text-white tabular-nums">
-                  <span>0:08</span>
-                  <span>{playingCard.duration}</span>
-                </div>
-                <div className="relative h-1 w-full rounded-full bg-white/30">
-                  <div className="absolute left-0 top-0 bottom-0 w-[12%] rounded-full bg-white" />
-                  <div className="absolute left-[12%] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow" />
-                </div>
-              </div>
-
-              {/* Three-Zone TV Player Controls Row */}
-              <div className="flex items-center justify-between">
-                {/* Left: Channel Avatar + Description Pill + Bell */}
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs font-bold uppercase">
-                    {playingCard.channel.charAt(0)}
-                  </div>
-                  <div className="px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-[11px] font-semibold text-white">
-                    Description
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                    <Bell className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-
-                {/* Center: Prev + Play (Active White Circle) + Next */}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs">
-                    &#9198;
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center shadow-lg">
-                    <Play className="w-4 h-4 fill-black ml-0.5" />
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs">
-                    &#9197;
-                  </div>
-                </div>
-
-                {/* Right: Like, Dislike, Comments, Save, Captions, Settings */}
-                <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center">
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center">
-                    <ThumbsUp className="w-3.5 h-3.5 rotate-180" />
-                  </div>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center">
-                    <Share2 className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center">
-                    <Maximize className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center">
-                    <Settings className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Suggested Strip: 3 Thumbnails across bottom edge, NO titles visible, draggable with mouse */}
-              <div
-                ref={fullscreenCarouselRef}
-                onMouseDown={handleCarouselMouseDown}
-                onMouseMove={handleCarouselMouseMove}
-                onMouseUp={stopCarouselDragging}
-                onMouseLeave={stopCarouselDragging}
-                className={`pt-1 flex items-start gap-3.5 overflow-x-auto scrollbar-none ${
-                  isDraggingCarousel ? 'cursor-grabbing' : 'cursor-grab'
-                }`}
-              >
-                {cards.slice(0, 6).map((card) => (
-                  <div
-                    key={card.id}
-                    className={`w-[295px] h-[126px] shrink-0 rounded-t-[12px] overflow-hidden bg-neutral-900 relative ${
-                      card.isUser ? 'ring-[3px] ring-white shadow-2xl' : ''
-                    }`}
-                  >
-                    <img
-                      src={card.thumbUrl}
-                      alt={card.title}
-                      draggable={false}
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        if (card.fallbackThumbUrl) {
-                          (e.target as HTMLImageElement).src = card.fallbackThumbUrl;
+                  return (
+                    <div
+                      key={`tv-sug-row-${rowIndex}`}
+                      onClick={() => {
+                        if (isPeekingRow) {
+                          setTvSuggestedStep(rowIndex + 1);
                         }
                       }}
-                      className="w-full h-[165px] object-cover object-top pointer-events-none select-none"
-                    />
-                  </div>
-                ))}
+                      className={`grid grid-cols-3 gap-5 h-[242px] mb-[24px] ${
+                        isPeekingRow ? 'cursor-pointer' : ''
+                      }`}
+                    >
+                      {rowCards.map((card) => (
+                        <div
+                          key={card.id}
+                          className="flex flex-col select-none"
+                        >
+                          {/* 16:9 Thumbnail (300x168px, clean without white borders) */}
+                          <div className="relative h-[168px] w-full rounded-[12px] overflow-hidden bg-neutral-900 shrink-0">
+                            <img
+                              src={card.thumbUrl}
+                              alt={card.title}
+                              draggable={false}
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                if (card.fallbackThumbUrl) {
+                                  (e.target as HTMLImageElement).src = card.fallbackThumbUrl;
+                                }
+                              }}
+                              className="w-full h-full object-cover pointer-events-none select-none"
+                            />
+                            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/85 text-white text-[11px] font-semibold tabular-nums">
+                              {card.duration}
+                            </div>
+                          </div>
+
+                          {/* Full Pack Metadata below Thumbnail (Visible when the row slides up into view) */}
+                          <div className="h-[74px] pt-2.5 pr-1 flex flex-col justify-start overflow-hidden">
+                            <h3
+                              className="text-[15px] leading-[19px] font-bold text-white line-clamp-2"
+                              style={{ maxWidth: '25ch' }}
+                            >
+                              {card.title}
+                            </h3>
+                            <div className="text-[11px] leading-[15px] text-neutral-300 truncate mt-1">
+                              {card.channel} · {card.views} views · {card.timeAgo}
+                            </div>
+                            <div className="text-[11px] leading-[14px] text-neutral-400 truncate">
+                              {card.channel}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Realistic Angled TV Stand Legs matching Reference Image */}
-      <div className="w-full max-w-[760px] flex items-start justify-between px-16 pointer-events-none">
-        <div className="w-4 h-12 bg-neutral-900 dark:bg-neutral-800 rotate-[28deg] -mt-1 rounded-b" />
-        <div className="w-4 h-12 bg-neutral-900 dark:bg-neutral-800 -rotate-[28deg] -mt-1 rounded-b" />
+      {/* Realistic Angled TV Stand Legs matching neutral-800 bezel */}
+      <div className="w-full max-w-[760px] flex items-start justify-between px-16 pointer-events-none -mt-3">
+        <div className="w-3.5 h-10 bg-neutral-800 rotate-[28deg] rounded-b" />
+        <div className="w-3.5 h-10 bg-neutral-800 -rotate-[28deg] rounded-b" />
       </div>
     </div>
   );
 };
+
+

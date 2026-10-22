@@ -107,15 +107,15 @@ export const YOUTUBE_SPECS: Record<
       maxLines: 2,
       thumbRatio: '16:9 (2 completas + 1/3 de la 3ra · Fila inferior "Continue watching")',
       description:
-        'YouTube Smart TV Home Page · 2 miniaturas completas con título + 3ra asomando (Arrastra con el mouse)',
+        'YouTube Smart TV Home Page · 2 miniaturas completas con título + 3ra lateral (Arrastra con el mouse)',
     },
     sidebar: {
-      maxVisibleChars: 44,
-      charsPerLine: 22,
+      maxVisibleChars: 46,
+      charsPerLine: 23,
       maxLines: 2,
-      thumbRatio: '16:9 (3 miniaturas inferiores sin título visible debajo de los controles)',
+      thumbRatio: '16:9 (Cuadrícula de 3 por fila)',
       description:
-        'YouTube Smart TV Suggested (Viendo un video) · Controles de reproducción + tira inferior de 3 miniaturas (sin título)',
+        'YouTube Smart TV Sugeridos (Viendo un video) · Cuadrícula de 3 columnas que sube fila por fila con el control (↓ o →)',
     },
     fullscreen: {
       maxVisibleChars: 44,
