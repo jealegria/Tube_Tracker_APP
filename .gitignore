@@ -2,21 +2,12 @@ node_modules/
 build/
 dist/
 coverage/
-.vite/
 .DS_Store
-Thumbs.db
 *.log
-*.local
 .env*
 !.env.example
 
-# AI Studio chat uploads & internal artifacts
-.aistudio/
+# AI Studio chat image uploads
 public/assets/aistudio/
 
-# Firebase cache & logs
-.firebase/
-firebase-debug.log*
-firestore-debug.log*
-ui-debug.log*
 
