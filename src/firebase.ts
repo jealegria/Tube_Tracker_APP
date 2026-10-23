@@ -18,7 +18,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { PackagingItem } from './types';
+import { PackagingItem, UserVideoFolder, UserVideoPack } from './types';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -350,6 +350,157 @@ export async function saveProfilePreferences(
     await setDoc(configDoc, payload);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, docPath);
+  }
+}
+
+// ==========================================
+// MIS VIDEOS: Cloud Folders & Packs (up to 10 folders, 5 packs each)
+// ==========================================
+
+export function subscribeToProfileMyVideos(
+  profileId: ProfileId,
+  onSuccess: (folders: UserVideoFolder[]) => void,
+  onError?: (err: unknown) => void
+) {
+  const colPath = `profiles/${profileId}/myVideos`;
+  const colRef = collection(db, 'profiles', profileId, 'myVideos');
+
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const folders: UserVideoFolder[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        folders.push({
+          id: data.id || docSnap.id,
+          profileId: data.profileId || profileId,
+          name: data.name || 'Video sin título',
+          createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
+          updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
+        });
+      });
+      folders.sort((a, b) => a.createdAt - b.createdAt);
+      onSuccess(folders);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, colPath);
+      if (onError) onError(error);
+    }
+  );
+}
+
+export async function saveProfileMyVideo(
+  profileId: ProfileId,
+  folder: UserVideoFolder
+): Promise<void> {
+  const docPath = `profiles/${profileId}/myVideos/${folder.id}`;
+  try {
+    const docRef = doc(db, 'profiles', profileId, 'myVideos', folder.id);
+    const payload = {
+      id: folder.id.slice(0, 128),
+      profileId,
+      userId: auth.currentUser?.uid || '',
+      name: folder.name.trim().slice(0, 200) || 'Nuevo Video',
+      createdAt: folder.createdAt || Date.now(),
+      updatedAt: folder.updatedAt || Date.now(),
+    };
+    await setDoc(docRef, payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, docPath);
+  }
+}
+
+export async function deleteProfileMyVideo(
+  profileId: ProfileId,
+  videoId: string,
+  packIds: string[]
+): Promise<void> {
+  const docPath = `profiles/${profileId}/myVideos/${videoId}`;
+  try {
+    const batch = writeBatch(db);
+    const videoRef = doc(db, 'profiles', profileId, 'myVideos', videoId);
+    batch.delete(videoRef);
+
+    for (const pid of packIds) {
+      const packRef = doc(db, 'profiles', profileId, 'myVideoPacks', pid);
+      batch.delete(packRef);
+    }
+
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, docPath);
+  }
+}
+
+export function subscribeToProfileMyVideoPacks(
+  profileId: ProfileId,
+  onSuccess: (packs: UserVideoPack[]) => void,
+  onError?: (err: unknown) => void
+) {
+  const colPath = `profiles/${profileId}/myVideoPacks`;
+  const colRef = collection(db, 'profiles', profileId, 'myVideoPacks');
+
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const packs: UserVideoPack[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        packs.push({
+          id: data.id || docSnap.id,
+          profileId: data.profileId || profileId,
+          videoId: data.videoId,
+          title: data.title || '',
+          thumbnailUrl: data.thumbnailUrl || '',
+          order: typeof data.order === 'number' ? data.order : 0,
+          createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
+          updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
+        });
+      });
+      packs.sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+      onSuccess(packs);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, colPath);
+      if (onError) onError(error);
+    }
+  );
+}
+
+export async function saveProfileMyVideoPack(
+  profileId: ProfileId,
+  pack: UserVideoPack
+): Promise<void> {
+  const docPath = `profiles/${profileId}/myVideoPacks/${pack.id}`;
+  try {
+    const docRef = doc(db, 'profiles', profileId, 'myVideoPacks', pack.id);
+    const safeOrder = Math.max(0, Math.min(4, Math.floor(pack.order)));
+    const payload = {
+      id: pack.id.slice(0, 128),
+      profileId,
+      userId: auth.currentUser?.uid || '',
+      videoId: pack.videoId.slice(0, 128),
+      title: pack.title.trim().slice(0, 500) || 'Sin título',
+      thumbnailUrl: pack.thumbnailUrl.slice(0, 450000),
+      order: safeOrder,
+      createdAt: pack.createdAt || Date.now(),
+      updatedAt: pack.updatedAt || Date.now(),
+    };
+    await setDoc(docRef, payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, docPath);
+  }
+}
+
+export async function deleteProfileMyVideoPack(
+  profileId: ProfileId,
+  packId: string
+): Promise<void> {
+  const docPath = `profiles/${profileId}/myVideoPacks/${packId}`;
+  try {
+    await deleteDoc(doc(db, 'profiles', profileId, 'myVideoPacks', packId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, docPath);
   }
 }
 

@@ -11,8 +11,33 @@ export interface PackagingItem {
   favorite?: boolean;
 }
 
+export interface UserVideoPack {
+  id: string;
+  profileId: string;
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UserVideoFolder {
+  id: string;
+  profileId: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type CategoryFilter = 'Todas' | string;
 
 export type SortOrder = 'newest' | 'oldest' | 'alpha';
 
-export type ActiveModule = 'repositorio' | 'preview' | 'abtesting' | 'datos' | 'settings';
+export type ActiveModule =
+  | 'repositorio'
+  | 'misvideos'
+  | 'preview'
+  | 'abtesting'
+  | 'datos'
+  | 'settings';

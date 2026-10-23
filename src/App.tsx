@@ -20,6 +20,7 @@ import { PackagingPreviewModule } from './components/PackagingPreviewModule';
 import { ABTestingModule } from './components/ABTestingModule';
 import { DataDashboardView } from './components/DataDashboardView';
 import { SettingsView } from './components/SettingsView';
+import { MyVideosModule } from './components/MyVideosModule';
 
 export function App() {
   const {
@@ -34,6 +35,13 @@ export function App() {
     tags,
     defaultChannelName,
     updateDefaultChannelName,
+    myVideos,
+    myVideoPacks,
+    createMyVideoFolder,
+    renameMyVideoFolder,
+    deleteMyVideoFolder,
+    upsertMyVideoPack,
+    removeMyVideoPack,
     sharedBannerCount,
     setSharedBannerCount,
     statusBanner,
@@ -247,12 +255,27 @@ export function App() {
               defaultChannelName={defaultChannelName}
               onSaveDefaultChannel={updateDefaultChannelName}
             />
+          ) : activeModule === 'misvideos' ? (
+            <MyVideosModule
+              theme={theme}
+              activeProfile={activeProfile}
+              defaultChannelName={defaultChannelName}
+              myVideos={myVideos}
+              myVideoPacks={myVideoPacks}
+              onCreateVideoFolder={createMyVideoFolder}
+              onRenameVideoFolder={renameMyVideoFolder}
+              onDeleteVideoFolder={deleteMyVideoFolder}
+              onUpsertVideoPack={upsertMyVideoPack}
+              onDeleteVideoPack={removeMyVideoPack}
+            />
           ) : activeModule === 'abtesting' ? (
             <ABTestingModule
               theme={theme}
               activeProfile={activeProfile}
               defaultChannelName={defaultChannelName}
               items={packagings}
+              myVideos={myVideos}
+              myVideoPacks={myVideoPacks}
             />
           ) : activeModule === 'preview' ? (
             <PackagingPreviewModule
@@ -261,6 +284,8 @@ export function App() {
               items={packagings}
               categories={categories}
               tags={tags}
+              myVideos={myVideos}
+              myVideoPacks={myVideoPacks}
             />
           ) : (
             <>

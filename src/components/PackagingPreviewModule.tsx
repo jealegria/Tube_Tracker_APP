@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Shuffle, Eye } from 'lucide-react';
-import { PackagingItem } from '../types';
+import { PackagingItem, UserVideoFolder, UserVideoPack } from '../types';
 import {
   UserDraftPack,
   FeedEntry,
   fisherYatesShuffle,
   getDeterministicMeta,
 } from './compare/types';
-import { UserPacksUploader } from './compare/UserPacksUploader';
+import { UserPacksUploader, PackSourceMode } from './compare/UserPacksUploader';
 import { CompetitorFilterPanel } from './compare/CompetitorFilterPanel';
 import { YouTubeHomeCompareView } from './compare/YouTubeHomeCompareView';
 
@@ -17,6 +17,8 @@ interface PackagingPreviewModuleProps {
   items: PackagingItem[];
   categories: string[];
   tags: string[];
+  myVideos: UserVideoFolder[];
+  myVideoPacks: UserVideoPack[];
 }
 
 export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
@@ -25,12 +27,23 @@ export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
   items,
   categories,
   tags,
+  myVideos,
+  myVideoPacks,
 }) => {
   const isLight = theme === 'light';
   const effectiveChannelName = defaultChannelName.trim() || 'Mi Canal';
 
-  // Uploaded user draft packs
-  const [userPacks, setUserPacks] = useState<UserDraftPack[]>([]);
+  // Source mode: 'cloud' (Mis Videos) vs 'ram' (Prueba Rápida)
+  const [sourceMode, setSourceMode] = useState<PackSourceMode>(() =>
+    myVideos.length > 0 ? 'cloud' : 'ram'
+  );
+
+  // Cloud ("Mis Videos") selection state
+  const [selectedCloudVideoId, setSelectedCloudVideoId] = useState<string | null>(null);
+  const [selectedCloudPackIds, setSelectedCloudPackIds] = useState<string[]>([]);
+
+  // Uploaded quick RAM draft packs
+  const [ramPacks, setRamPacks] = useState<UserDraftPack[]>([]);
 
   // Competitor filters (categories & tags)
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
@@ -41,6 +54,27 @@ export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
 
   // Shuffled feed state
   const [shuffledFeed, setShuffledFeed] = useState<FeedEntry[]>([]);
+
+  // Convert selected cloud packs into UserDraftPack format
+  const activeUserPacks = useMemo<UserDraftPack[]>(() => {
+    if (sourceMode === 'ram') {
+      return ramPacks;
+    }
+
+    return myVideoPacks
+      .filter((p) => selectedCloudPackIds.includes(p.id))
+      .map((p) => {
+        const meta = getDeterministicMeta(p.id);
+        return {
+          id: p.id,
+          title: p.title,
+          thumbnailUrl: p.thumbnailUrl,
+          duration: meta.duration,
+          viewsLabel: meta.viewsLabel,
+          timeAgoLabel: '2 hours ago',
+        };
+      });
+  }, [sourceMode, ramPacks, myVideoPacks, selectedCloudPackIds]);
 
   // Filter competitor pool based on chosen category and tags
   const competitorPool = useMemo(() => {
@@ -57,7 +91,7 @@ export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
     });
   }, [items, selectedCategory, selectedTags]);
 
-  // Build and shuffle the feed (up to 20 random competitors from pool + all user uploaded packs)
+  // Build and shuffle the feed (up to 20 random competitors from pool + all active user packs)
   const buildShuffledFeed = useCallback(() => {
     const shuffledCompetitors = fisherYatesShuffle(competitorPool).slice(0, 20);
 
@@ -70,18 +104,28 @@ export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
       };
     });
 
-    const userEntries: FeedEntry[] = userPacks.map((pack) => ({
+    const userEntries: FeedEntry[] = activeUserPacks.map((pack) => ({
       kind: 'user',
       data: pack,
     }));
 
     const combined = fisherYatesShuffle([...userEntries, ...repoEntries]);
     setShuffledFeed(combined);
-  }, [competitorPool, userPacks]);
+  }, [competitorPool, activeUserPacks]);
 
   useEffect(() => {
     buildShuffledFeed();
   }, [buildShuffledFeed]);
+
+  const handleToggleCloudPack = (packId: string) => {
+    setSelectedCloudPackIds((prev) =>
+      prev.includes(packId) ? prev.filter((id) => id !== packId) : [...prev, packId]
+    );
+  };
+
+  const handleSelectAllCloudPacksInVideo = (packIds: string[]) => {
+    setSelectedCloudPackIds((prev) => Array.from(new Set([...prev, ...packIds])));
+  };
 
   const toggleCompetitorTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -91,15 +135,25 @@ export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Panel: Step 1 (Upload Multiple Packs) & Step 2 (Competitor Filters) */}
+      {/* Top Panel: Step 1 (Select from Mis Videos or Quick RAM) & Step 2 (Competitor Filters) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         <UserPacksUploader
           theme={theme}
           channelName={defaultChannelName}
-          userPacks={userPacks}
-          onAddPack={(newPack) => setUserPacks((prev) => [...prev, newPack])}
-          onRemovePack={(id) => setUserPacks((prev) => prev.filter((p) => p.id !== id))}
-          onClearAllPacks={() => setUserPacks([])}
+          sourceMode={sourceMode}
+          onChangeSourceMode={setSourceMode}
+          myVideos={myVideos}
+          myVideoPacks={myVideoPacks}
+          selectedCloudVideoId={selectedCloudVideoId}
+          selectedCloudPackIds={selectedCloudPackIds}
+          onSelectCloudVideo={setSelectedCloudVideoId}
+          onToggleCloudPack={handleToggleCloudPack}
+          onSelectAllCloudPacksInVideo={handleSelectAllCloudPacksInVideo}
+          onClearCloudSelection={() => setSelectedCloudPackIds([])}
+          ramPacks={ramPacks}
+          onAddRamPack={(newPack) => setRamPacks((prev) => [...prev, newPack])}
+          onRemoveRamPack={(id) => setRamPacks((prev) => prev.filter((p) => p.id !== id))}
+          onClearRamPacks={() => setRamPacks([])}
         />
 
         <CompetitorFilterPanel
@@ -109,7 +163,7 @@ export const PackagingPreviewModule: React.FC<PackagingPreviewModuleProps> = ({
           selectedCategory={selectedCategory}
           selectedTags={selectedTags}
           competitorCount={competitorPool.length}
-          userPacksCount={userPacks.length}
+          userPacksCount={activeUserPacks.length}
           onSelectCategory={setSelectedCategory}
           onToggleTag={toggleCompetitorTag}
           onClearTags={() => setSelectedTags([])}

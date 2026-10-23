@@ -7,7 +7,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique packaging identifier"
+          "description": "Unique packaging identifier",
+          "maxLength": 128
         },
         "profileId": {
           "type": "string",
@@ -15,15 +16,18 @@
         },
         "userId": {
           "type": "string",
-          "description": "The UID of the user who created or updated this item"
+          "description": "The UID of the user who created or updated this item",
+          "maxLength": 128
         },
         "videoId": {
           "type": "string",
-          "description": "The YouTube video ID"
+          "description": "The YouTube video ID",
+          "maxLength": 64
         },
         "url": {
           "type": "string",
-          "description": "Canonical watch URL of the YouTube video"
+          "description": "Canonical watch URL of the YouTube video",
+          "maxLength": 500
         },
         "title": {
           "type": "string",
@@ -84,6 +88,90 @@
         }
       },
       "required": ["profileId"]
+    },
+    "UserVideoFolder": {
+      "title": "UserVideoFolder",
+      "description": "A user video folder in Mis Videos (up to 10 per profile) that groups up to 5 custom packs",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique video folder identifier",
+          "maxLength": 128
+        },
+        "profileId": {
+          "type": "string",
+          "description": "The profile identifier (johnny or guido)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who created or updated this folder",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Name or idea title of the video project",
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Last update timestamp in milliseconds"
+        }
+      },
+      "required": ["id", "profileId", "name", "createdAt", "updatedAt"]
+    },
+    "UserVideoPack": {
+      "title": "UserVideoPack",
+      "description": "An uploaded custom pack (thumbnail + title) belonging to a UserVideoFolder (up to 5 per video)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique pack identifier",
+          "maxLength": 128
+        },
+        "profileId": {
+          "type": "string",
+          "description": "The profile identifier (johnny or guido)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who created or updated this pack",
+          "maxLength": 128
+        },
+        "videoId": {
+          "type": "string",
+          "description": "The ID of the parent UserVideoFolder",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "The YouTube video title for this pack variation",
+          "maxLength": 500
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "Compressed HD thumbnail Data URL",
+          "maxLength": 450000
+        },
+        "order": {
+          "type": "number",
+          "description": "Slot index of the pack within the video folder (0 to 4)"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Last update timestamp in milliseconds"
+        }
+      },
+      "required": ["id", "profileId", "videoId", "title", "thumbnailUrl", "order", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -94,6 +182,14 @@
     "/profiles/{profileId}/config/preferences": {
       "schema": "ProfileConfig",
       "description": "Profile-scoped category, tag, and default channel configuration"
+    },
+    "/profiles/{profileId}/myVideos/{videoId}": {
+      "schema": "UserVideoFolder",
+      "description": "Profile-scoped video folders (up to 10 per profile) in Mis Videos"
+    },
+    "/profiles/{profileId}/myVideoPacks/{packId}": {
+      "schema": "UserVideoPack",
+      "description": "Profile-scoped custom packs (thumbnail + title, up to 5 per video folder) in Mis Videos"
     }
   }
 }

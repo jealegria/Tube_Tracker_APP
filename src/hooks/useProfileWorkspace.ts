@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { PackagingItem } from '../types';
+import { PackagingItem, UserVideoFolder, UserVideoPack } from '../types';
 import { DEFAULT_TAGS, INITIAL_SAMPLE_PACKAGINGS } from '../utils/youtube';
 import { parseShareUrl } from '../utils/shareUrl';
 import {
@@ -14,6 +14,12 @@ import {
   deleteProfilePackaging,
   subscribeToProfilePreferences,
   saveProfilePreferences,
+  subscribeToProfileMyVideos,
+  saveProfileMyVideo,
+  deleteProfileMyVideo,
+  subscribeToProfileMyVideoPacks,
+  saveProfileMyVideoPack,
+  deleteProfileMyVideoPack,
   migrateItemsToProfile,
   checkAndMigrateLegacyUserCollection,
 } from '../firebase';
@@ -40,6 +46,9 @@ export function useProfileWorkspace() {
   const [categories, setCategories] = useState<string[]>(['Ideas', 'Formatos']);
   const [tags, setTags] = useState<string[]>(DEFAULT_TAGS);
   const [defaultChannelName, setDefaultChannelName] = useState<string>('Johnny BT');
+
+  const [myVideos, setMyVideos] = useState<UserVideoFolder[]>([]);
+  const [myVideoPacks, setMyVideoPacks] = useState<UserVideoPack[]>([]);
 
   const [sharedBannerCount, setSharedBannerCount] = useState<number | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
@@ -195,9 +204,19 @@ export function useProfileWorkspace() {
       }
     });
 
+    const unsubMyVideos = subscribeToProfileMyVideos(activeProfile, (folders) => {
+      setMyVideos(folders);
+    });
+
+    const unsubMyVideoPacks = subscribeToProfileMyVideoPacks(activeProfile, (packs) => {
+      setMyVideoPacks(packs);
+    });
+
     return () => {
       unsubPackagings();
       unsubPrefs();
+      unsubMyVideos();
+      unsubMyVideoPacks();
     };
   }, [user, isAuthorized, activeProfile, ownProfile]);
 
@@ -394,6 +413,101 @@ export function useProfileWorkspace() {
     }
   };
 
+  // ==========================================
+  // MIS VIDEOS CRUD ACTIONS (Max 10 folders, Max 5 packs per folder)
+  // ==========================================
+
+  const createMyVideoFolder = async (name: string): Promise<UserVideoFolder | null> => {
+    if (myVideos.length >= 10) return null;
+    const now = Date.now();
+    const newFolder: UserVideoFolder = {
+      id: `myvid-${now}-${Math.random().toString(36).slice(2, 7)}`,
+      profileId: activeProfile,
+      name: name.trim().slice(0, 200) || `Video #${myVideos.length + 1}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setMyVideos((prev) => [...prev, newFolder]);
+    if (user && isAuthorized) {
+      await saveProfileMyVideo(activeProfile, newFolder);
+    }
+    return newFolder;
+  };
+
+  const renameMyVideoFolder = async (videoId: string, newName: string) => {
+    const trimmed = newName.trim().slice(0, 200);
+    if (!trimmed) return;
+    const now = Date.now();
+    const target = myVideos.find((v) => v.id === videoId);
+    if (!target) return;
+
+    const updated: UserVideoFolder = { ...target, name: trimmed, updatedAt: now };
+    setMyVideos((prev) => prev.map((v) => (v.id === videoId ? updated : v)));
+    if (user && isAuthorized) {
+      await saveProfileMyVideo(activeProfile, updated);
+    }
+  };
+
+  const deleteMyVideoFolder = async (videoId: string) => {
+    const associatedPackIds = myVideoPacks
+      .filter((p) => p.videoId === videoId)
+      .map((p) => p.id);
+
+    setMyVideos((prev) => prev.filter((v) => v.id !== videoId));
+    setMyVideoPacks((prev) => prev.filter((p) => p.videoId !== videoId));
+
+    if (user && isAuthorized) {
+      await deleteProfileMyVideo(activeProfile, videoId, associatedPackIds);
+    }
+  };
+
+  const upsertMyVideoPack = async (
+    videoId: string,
+    orderIndex: number,
+    title: string,
+    thumbnailUrl: string,
+    existingPackId?: string
+  ) => {
+    const now = Date.now();
+    const existing = existingPackId
+      ? myVideoPacks.find((p) => p.id === existingPackId)
+      : myVideoPacks.find((p) => p.videoId === videoId && p.order === orderIndex);
+
+    const pack: UserVideoPack = {
+      id: existing ? existing.id : `mypack-${now}-${Math.random().toString(36).slice(2, 7)}`,
+      profileId: activeProfile,
+      videoId,
+      title: title.trim().slice(0, 500),
+      thumbnailUrl,
+      order: Math.max(0, Math.min(4, orderIndex)),
+      createdAt: existing ? existing.createdAt : now,
+      updatedAt: now,
+    };
+
+    setMyVideoPacks((prev) => {
+      const filtered = prev.filter((p) => p.id !== pack.id);
+      return [...filtered, pack].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+    });
+
+    if (user && isAuthorized) {
+      await saveProfileMyVideoPack(activeProfile, pack);
+      // Also bump parent folder updatedAt
+      const parent = myVideos.find((v) => v.id === videoId);
+      if (parent) {
+        const updatedFolder = { ...parent, updatedAt: now };
+        setMyVideos((prev) => prev.map((v) => (v.id === videoId ? updatedFolder : v)));
+        await saveProfileMyVideo(activeProfile, updatedFolder);
+      }
+    }
+  };
+
+  const removeMyVideoPack = async (packId: string) => {
+    setMyVideoPacks((prev) => prev.filter((p) => p.id !== packId));
+    if (user && isAuthorized) {
+      await deleteProfileMyVideoPack(activeProfile, packId);
+    }
+  };
+
   const importItems = async (importedItems: PackagingItem[]) => {
     const existingIds = new Set(packagings.map((p) => p.videoId));
     const uniqueNew = importedItems.filter((p) => !existingIds.has(p.videoId));
@@ -459,6 +573,13 @@ export function useProfileWorkspace() {
     tags,
     defaultChannelName,
     updateDefaultChannelName,
+    myVideos,
+    myVideoPacks,
+    createMyVideoFolder,
+    renameMyVideoFolder,
+    deleteMyVideoFolder,
+    upsertMyVideoPack,
+    removeMyVideoPack,
     sharedBannerCount,
     setSharedBannerCount,
     statusBanner,

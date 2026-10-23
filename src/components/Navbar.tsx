@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Youtube,
   LayoutGrid,
+  FolderKanban,
   Tv,
   FlaskConical,
   Database,
@@ -47,6 +48,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       id: 'repositorio',
       label: 'Repositorio',
       icon: LayoutGrid,
+    },
+    {
+      id: 'misvideos',
+      label: 'Mis Videos',
+      icon: FolderKanban,
     },
     {
       id: 'preview',

@@ -74,6 +74,27 @@ service cloud.firestore {
              (!('defaultChannelName' in data) || (data.defaultChannelName is string && data.defaultChannelName.size() <= 120));
     }
 
+    function isValidUserVideoFolder(data, profileId) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.profileId is string && data.profileId == profileId &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128));
+    }
+
+    function isValidUserVideoPack(data, profileId) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.profileId is string && data.profileId == profileId &&
+             data.videoId is string && data.videoId.size() > 0 && data.videoId.size() <= 128 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 500 &&
+             data.thumbnailUrl is string && data.thumbnailUrl.size() > 0 && data.thumbnailUrl.size() <= 450000 &&
+             data.order is number && data.order >= 0 && data.order < 5 &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128));
+    }
+
     match /profiles/{profileId}/packagings/{packagingId} {
       allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
       allow create: if isAuthorizedUser() &&
@@ -103,6 +124,47 @@ service cloud.firestore {
                                incoming().keys().hasOnly(['profileId', 'userId', 'categories', 'tags', 'defaultChannelName']) &&
                                isValidProfileConfig(incoming(), profileId);
       allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && configId == 'preferences';
+    }
+
+    match /profiles/{profileId}/myVideos/{videoId} {
+      allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
+      allow create: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(videoId) &&
+                       incoming().keys().hasAll(['id', 'profileId', 'name', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'name', 'createdAt', 'updatedAt']) &&
+                       isValidUserVideoFolder(incoming(), profileId);
+      allow update: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(videoId) &&
+                       incoming().id == existing().id &&
+                       incoming().profileId == existing().profileId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasAll(['id', 'profileId', 'name', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'name', 'createdAt', 'updatedAt']) &&
+                       isValidUserVideoFolder(incoming(), profileId);
+      allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && isValidId(videoId);
+    }
+
+    match /profiles/{profileId}/myVideoPacks/{packId} {
+      allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
+      allow create: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(packId) &&
+                       incoming().keys().hasAll(['id', 'profileId', 'videoId', 'title', 'thumbnailUrl', 'order', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'videoId', 'title', 'thumbnailUrl', 'order', 'createdAt', 'updatedAt']) &&
+                       isValidUserVideoPack(incoming(), profileId);
+      allow update: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(packId) &&
+                       incoming().id == existing().id &&
+                       incoming().profileId == existing().profileId &&
+                       incoming().videoId == existing().videoId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasAll(['id', 'profileId', 'videoId', 'title', 'thumbnailUrl', 'order', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'videoId', 'title', 'thumbnailUrl', 'order', 'createdAt', 'updatedAt']) &&
+                       isValidUserVideoPack(incoming(), profileId);
+      allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && isValidId(packId);
     }
 
     match /users/{userId}/packagings/{packagingId} {
