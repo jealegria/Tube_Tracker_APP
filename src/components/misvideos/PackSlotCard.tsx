@@ -49,6 +49,30 @@ export const PackSlotCard: React.FC<PackSlotCardProps> = ({
 
   const packLetter = String.fromCharCode(65 + slotIndex);
 
+  React.useEffect(() => {
+    if (existingPack) {
+      setDraftTitle(existingPack.title);
+      setDraftThumb(existingPack.thumbnailUrl);
+    } else {
+      setDraftTitle('');
+      setDraftThumb(null);
+      setIsEditing(false);
+      setConfirmDelete(false);
+      setErrorMsg(null);
+    }
+  }, [existingPack?.id, existingPack?.title, existingPack?.thumbnailUrl]);
+
+  const handleConfirmDelete = async () => {
+    if (!existingPack) return;
+    const idToDelete = existingPack.id;
+    setDraftTitle('');
+    setDraftThumb(null);
+    setIsEditing(false);
+    setConfirmDelete(false);
+    setErrorMsg(null);
+    await onDeletePack(idToDelete);
+  };
+
   const startEditing = () => {
     setDraftTitle(existingPack?.title || '');
     setDraftThumb(existingPack?.thumbnailUrl || null);
@@ -215,7 +239,7 @@ export const PackSlotCard: React.FC<PackSlotCardProps> = ({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => void onDeletePack(existingPack.id)}
+                onClick={() => void handleConfirmDelete()}
                 className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[11px] font-semibold cursor-pointer"
               >
                 Confirmar

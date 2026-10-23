@@ -151,7 +151,7 @@ export const VideoFolderDetailView: React.FC<VideoFolderDetailViewProps> = ({
           const packForSlot = folderPacks.find((p) => p.order === idx);
           return (
             <PackSlotCard
-              key={`${folder.id}-slot-${idx}`}
+              key={`${folder.id}-slot-${idx}-${packForSlot?.id || 'empty'}`}
               slotIndex={idx}
               videoId={folder.id}
               existingPack={packForSlot}
