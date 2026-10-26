@@ -12,7 +12,7 @@ import { SimulatorToolbar } from './abtesting/SimulatorToolbar';
 import { YouTubeDeviceSimulator } from './abtesting/YouTubeDeviceSimulator';
 import { fisherYatesShuffle } from './compare/types';
 
-interface ABTestingModuleProps {
+interface TestingModuleProps {
   theme: 'dark' | 'light';
   activeProfile: ProfileId;
   defaultChannelName: string;
@@ -21,7 +21,7 @@ interface ABTestingModuleProps {
   myVideoPacks: UserVideoPack[];
 }
 
-export const ABTestingModule: React.FC<ABTestingModuleProps> = ({
+export const TestingModule: React.FC<TestingModuleProps> = ({
   theme,
   defaultChannelName,
   items,

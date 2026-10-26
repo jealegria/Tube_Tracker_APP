@@ -38,6 +38,6 @@ export type ActiveModule =
   | 'repositorio'
   | 'misvideos'
   | 'preview'
-  | 'abtesting'
+  | 'testing'
   | 'datos'
   | 'settings';

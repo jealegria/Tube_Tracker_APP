@@ -1,6 +1,6 @@
 # Changelog
 
-Todos los cambios notables en este proyecto (**TubeSwipe · YouTube Packaging & A/B Testing Studio**) se documentan en este archivo.
+Todos los cambios notables en este proyecto (**TubeSwipe · YouTube Packaging & Testing Studio**) se documentan en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 
@@ -32,7 +32,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [1.3.0] - 2026-10-22
 
 ### Added
-- **Módulo de A/B Testing Multi-Dispositivo:**
+- **Módulo de Testing Multi-Dispositivo:**
   - Gestión de proyectos de videos numerados (`Video #1`, `Video #2`, etc.) con múltiples variaciones (`Var A`, `Var B`, `Var C`...) compuestas por miniatura local y título.
   - **Simulador 1:1 de YouTube 2026** con soporte para 4 dispositivos y sus ubicaciones reales:
     - **PC (Desktop Web):** `Homepage` (grilla de 3 columnas, corte a ~35 caract./línea) y `Sidebar (Viendo un video)` (miniatura grande de 246×138px + columna de texto angosta de ~20 caract./línea).

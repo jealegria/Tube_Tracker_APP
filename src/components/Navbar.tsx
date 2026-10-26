@@ -60,8 +60,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       icon: Tv,
     },
     {
-      id: 'abtesting',
-      label: 'A/B Testing',
+      id: 'testing',
+      label: 'Testing',
       icon: FlaskConical,
     },
     {

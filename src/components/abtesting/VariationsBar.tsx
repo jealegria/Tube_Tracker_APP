@@ -70,7 +70,7 @@ export const VariationsBar: React.FC<VariationsBarProps> = ({
         }`}
       >
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-sm font-bold">A/B Testing</h2>
+          <h2 className="text-sm font-bold">Testing</h2>
 
           <div
             className={`inline-flex items-center p-1 rounded-xl border ${

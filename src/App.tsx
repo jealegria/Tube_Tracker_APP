@@ -17,7 +17,7 @@ import { PackagingCard } from './components/PackagingCard';
 import { LightboxModal } from './components/LightboxModal';
 import { TagManagerModal } from './components/TagManagerModal';
 import { PackagingPreviewModule } from './components/PackagingPreviewModule';
-import { ABTestingModule } from './components/ABTestingModule';
+import { TestingModule } from './components/ABTestingModule';
 import { DataDashboardView } from './components/DataDashboardView';
 import { SettingsView } from './components/SettingsView';
 import { MyVideosModule } from './components/MyVideosModule';
@@ -268,8 +268,8 @@ export function App() {
               onUpsertVideoPack={upsertMyVideoPack}
               onDeleteVideoPack={removeMyVideoPack}
             />
-          ) : activeModule === 'abtesting' ? (
-            <ABTestingModule
+          ) : activeModule === 'testing' ? (
+            <TestingModule
               theme={theme}
               activeProfile={activeProfile}
               defaultChannelName={defaultChannelName}

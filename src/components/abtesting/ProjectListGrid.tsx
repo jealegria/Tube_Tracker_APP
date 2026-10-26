@@ -51,7 +51,7 @@ export const ProjectListGrid: React.FC<ProjectListGridProps> = ({
           <div className="flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-red-500" />
             <h1 className="text-lg font-bold tracking-tight">
-              A/B Testing de Packagings
+              Testing de Packagings
             </h1>
           </div>
           <p className="text-xs text-neutral-500 mt-0.5">
@@ -101,7 +101,7 @@ export const ProjectListGrid: React.FC<ProjectListGridProps> = ({
           </div>
           <div className="space-y-1">
             <h3 className="text-sm font-semibold">
-              Aún no tienes videos en A/B Testing
+              Aún no tienes videos en Testing
             </h3>
             <p className="text-xs text-neutral-500 max-w-md mx-auto">
               Crea el <strong>Video #1</strong> arriba para subir tus variaciones de miniatura y título y simularlas en PC, Mobile, Tablet y Smart TV.

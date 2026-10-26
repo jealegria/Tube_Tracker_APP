@@ -64,7 +64,7 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
   const effectiveChannel = channelName.trim() || 'Mi Canal';
 
   // Separate the currently playing video (last item in surroundingItems) from the recommended feed cards
-  // so the video being watched never repeats in the suggested list below/beside the user's A/B variation
+  // so the video being watched never repeats in the suggested list below/beside the user's variation
   const { cards, playingCard } = React.useMemo(() => {
     const timeLabels = ['8mo ago', '1mo ago', '2w ago', '1y ago', '3d ago', '5mo ago', '10d ago'];
     const compactViews = ['104K', '7K', '42K', '218K', '89K', '15K', '310K'];
@@ -1120,7 +1120,7 @@ const SmartTVSimulatorView: React.FC<SmartTVSimulatorViewProps> = ({
   // 3 = Fila 3 entera + Fila 4 asomando abajo
   // 4 = Fila 4 entera + Fila 5 asomando abajo
   const [tvSuggestedStep, setTvSuggestedStep] = React.useState<number>(0);
-  // Which row (0-indexed: 0 = Fila 1, 1 = Fila 2, 2 = Fila 3) holds the user's A/B variation
+  // Which row (0-indexed: 0 = Fila 1, 1 = Fila 2, 2 = Fila 3) holds the user's variation
   const [userTargetRow, setUserTargetRow] = React.useState<number>(0);
 
   // TV Background ("Mirando el video") controls: randomize playing video or set screen to pure black
