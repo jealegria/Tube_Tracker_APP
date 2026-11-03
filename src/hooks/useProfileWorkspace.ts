@@ -218,6 +218,18 @@ export function useProfileWorkspace() {
       setMyVideoPacks(packs);
     });
 
+    return () => {
+      unsubPackagings();
+      unsubPrefs();
+      unsubMyVideos();
+      unsubMyVideoPacks();
+    };
+  }, [user, isAuthorized, activeProfile, ownProfile]);
+
+  // Ideas are personal to each logged-in user (ownProfile) and not shared across profiles
+  useEffect(() => {
+    if (!user || !isAuthorized) return;
+
     const loadLocalIdeasFallback = (prof: ProfileId): VideoIdea[] => {
       try {
         const saved = localStorage.getItem(getIdeasKey(prof));
@@ -232,27 +244,23 @@ export function useProfileWorkspace() {
     };
 
     const unsubIdeas = subscribeToProfileIdeas(
-      activeProfile,
+      ownProfile,
       (cloudIdeas) => {
         if (cloudIdeas.length > 0) {
           setIdeas(cloudIdeas);
         } else {
-          setIdeas(loadLocalIdeasFallback(activeProfile));
+          setIdeas(loadLocalIdeasFallback(ownProfile));
         }
       },
       () => {
-        setIdeas(loadLocalIdeasFallback(activeProfile));
+        setIdeas(loadLocalIdeasFallback(ownProfile));
       }
     );
 
     return () => {
-      unsubPackagings();
-      unsubPrefs();
-      unsubMyVideos();
-      unsubMyVideoPacks();
       unsubIdeas();
     };
-  }, [user, isAuthorized, activeProfile, ownProfile]);
+  }, [user, isAuthorized, ownProfile]);
 
   useEffect(() => {
     if (!isAuthorized) return;
@@ -277,11 +285,11 @@ export function useProfileWorkspace() {
   useEffect(() => {
     if (!isAuthorized) return;
     try {
-      localStorage.setItem(getIdeasKey(activeProfile), JSON.stringify(ideas));
+      localStorage.setItem(getIdeasKey(ownProfile), JSON.stringify(ideas));
     } catch {
       // Ignore quota errors if dataUrls are large
     }
-  }, [ideas, activeProfile, isAuthorized]);
+  }, [ideas, ownProfile, isAuthorized]);
 
   const addPackaging = async (newItem: PackagingItem) => {
     setPackagings((prev) => [newItem, ...prev]);
@@ -629,7 +637,7 @@ export function useProfileWorkspace() {
   };
 
   // ==========================================
-  // IDEAS CRUD ACTIONS (Thumbnail + 4 Titles + Notes)
+  // IDEAS CRUD ACTIONS (Personal to ownProfile - Not shared across profiles)
   // ==========================================
 
   const addIdea = async (input: {
@@ -643,7 +651,7 @@ export function useProfileWorkspace() {
     const now = Date.now();
     const newIdea: VideoIdea = {
       id: `idea-${now}-${Math.random().toString(36).slice(2, 7)}`,
-      profileId: activeProfile,
+      profileId: ownProfile,
       sourceType: input.sourceType,
       videoUrl: input.videoUrl?.trim() || undefined,
       videoId: input.videoId?.trim() || undefined,
@@ -661,7 +669,7 @@ export function useProfileWorkspace() {
 
     setIdeas((prev) => [newIdea, ...prev]);
     if (user && isAuthorized) {
-      await saveProfileIdea(activeProfile, newIdea);
+      await saveProfileIdea(ownProfile, newIdea);
     }
     return newIdea;
   };
@@ -688,6 +696,7 @@ export function useProfileWorkspace() {
     const updated: VideoIdea = {
       ...target,
       ...patch,
+      profileId: ownProfile,
       titles: updatedTitles,
       notes:
         patch.notes !== undefined
@@ -698,14 +707,14 @@ export function useProfileWorkspace() {
 
     setIdeas((prev) => prev.map((item) => (item.id === ideaId ? updated : item)));
     if (user && isAuthorized) {
-      await saveProfileIdea(activeProfile, updated);
+      await saveProfileIdea(ownProfile, updated);
     }
   };
 
   const removeIdea = async (ideaId: string) => {
     setIdeas((prev) => prev.filter((item) => item.id !== ideaId));
     if (user && isAuthorized) {
-      await deleteProfileIdea(activeProfile, ideaId);
+      await deleteProfileIdea(ownProfile, ideaId);
     }
   };
 

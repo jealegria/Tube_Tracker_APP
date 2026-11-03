@@ -219,7 +219,7 @@ export function App() {
             </div>
           )}
 
-          {activeProfile !== ownProfile && (
+          {activeProfile !== ownProfile && activeModule !== 'ideas' && (
             <div
               className={`border rounded-xl px-4 py-2 flex items-center justify-between gap-3 text-xs ${
                 isLight
@@ -289,7 +289,7 @@ export function App() {
           ) : activeModule === 'ideas' ? (
             <IdeasModule
               theme={theme}
-              activeProfile={activeProfile}
+              ownProfile={ownProfile}
               ideas={ideas}
               onAddIdea={addIdea}
               onUpdateIdea={updateIdea}

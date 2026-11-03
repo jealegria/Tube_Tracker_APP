@@ -266,9 +266,13 @@ export const IdeaCreateForm: React.FC<IdeaCreateFormProps> = ({
         </div>
       )}
 
-      {/* Sketch Preview & Editable Fields: Left Thumbnail + Right 4 Titles */}
-      <div className="flex flex-col lg:flex-row items-stretch gap-4">
-        {/* Left Rectangle: Thumbnail Preview / Uploader */}
+      {/* 3-Column Sketch Preview:
+          1. Left (Blue Rectangle): Thumbnail Preview / Uploader
+          2. Middle (4 Yellow Rectangles): 4 Shorter Title Inputs
+          3. Right (Red Square): Side Note Box
+      */}
+      <div className="flex flex-col lg:flex-row items-stretch gap-3.5">
+        {/* 1. Left: Thumbnail Preview / Uploader */}
         <div className="w-full lg:w-[360px] xl:w-[400px] shrink-0">
           <input
             ref={uploadInputRef}
@@ -356,12 +360,12 @@ export const IdeaCreateForm: React.FC<IdeaCreateFormProps> = ({
           </div>
         </div>
 
-        {/* Right 4 Yellow Rectangles: 4 Editable Title Inputs */}
-        <div className="flex-1 flex flex-col justify-between gap-2.5">
+        {/* 2. Middle: 4 Shorter Editable Title Inputs */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between gap-2.5">
           {[0, 1, 2, 3].map((slotIdx) => (
             <div
               key={slotIdx}
-              className={`flex items-center rounded-xl border flex-1 min-h-[46px] px-3 py-1.5 transition-colors ${
+              className={`flex items-center rounded-xl border flex-1 min-h-[44px] px-3 py-1.5 transition-colors ${
                 isLight
                   ? 'bg-amber-50/70 border-amber-300 focus-within:border-amber-500 focus-within:bg-white'
                   : 'bg-amber-500/[0.07] border-amber-500/30 focus-within:border-amber-400 focus-within:bg-neutral-900'
@@ -373,6 +377,7 @@ export const IdeaCreateForm: React.FC<IdeaCreateFormProps> = ({
               <input
                 type="text"
                 value={titlesDraft[slotIdx]}
+                title={titlesDraft[slotIdx] || undefined}
                 onChange={(e) => {
                   const val = e.target.value;
                   setTitlesDraft((prev) => {
@@ -388,10 +393,10 @@ export const IdeaCreateForm: React.FC<IdeaCreateFormProps> = ({
                 }}
                 placeholder={
                   slotIdx === 0 && createMode === 'url'
-                    ? 'Título 1 (se autocompleta con el título del URL)...'
+                    ? 'Título 1 (se autocompleta del URL)...'
                     : `Opción de título #${slotIdx + 1}...`
                 }
-                className={`w-full bg-transparent text-xs sm:text-sm font-medium outline-none ${
+                className={`w-full bg-transparent text-xs sm:text-sm font-medium outline-none truncate focus:text-clip ${
                   isLight
                     ? 'text-neutral-900 placeholder:text-neutral-400'
                     : 'text-neutral-100 placeholder:text-neutral-500'
@@ -400,25 +405,30 @@ export const IdeaCreateForm: React.FC<IdeaCreateFormProps> = ({
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Optional Note Input */}
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-neutral-400 flex items-center gap-1.5">
-          <StickyNote className="w-3.5 h-3.5 text-amber-400" />
-          <span>Nota de la idea (opcional)</span>
-        </label>
-        <input
-          type="text"
-          value={notesDraft}
-          onChange={(e) => setNotesDraft(e.target.value)}
-          placeholder="Ej: Adaptar este concepto al nicho local, probar miniatura con texto corto..."
-          className={`w-full border rounded-xl px-3.5 py-2 text-xs outline-none ${
+        {/* 3. Right Side: Note Square Box (Red Square in Sketch) */}
+        <div
+          className={`w-full lg:w-[230px] xl:w-[260px] shrink-0 rounded-xl border p-3 flex flex-col justify-between transition-colors ${
             isLight
-              ? 'bg-neutral-50 border-neutral-300 focus:border-neutral-500 text-neutral-900'
-              : 'bg-neutral-950 border-neutral-800 focus:border-neutral-700 text-neutral-200'
+              ? 'bg-red-50/60 border-red-200 focus-within:border-red-400 focus-within:bg-white'
+              : 'bg-red-500/[0.07] border-red-500/30 focus-within:border-red-400 focus-within:bg-neutral-900'
           }`}
-        />
+        >
+          <span className="text-[11px] font-semibold text-red-400 flex items-center gap-1 mb-1.5">
+            <StickyNote className="w-3 h-3" />
+            <span>Nota (opcional)</span>
+          </span>
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            placeholder="Escribir nota breve al costado..."
+            className={`w-full flex-1 min-h-[90px] lg:min-h-0 bg-transparent text-xs leading-relaxed outline-none resize-none ${
+              isLight
+                ? 'text-neutral-800 placeholder:text-neutral-400'
+                : 'text-neutral-200 placeholder:text-neutral-500'
+            }`}
+          />
+        </div>
       </div>
 
       {errorMsg && (

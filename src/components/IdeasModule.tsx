@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lightbulb, Plus, Search, X } from 'lucide-react';
+import { Lightbulb, Plus, Search, X, Lock } from 'lucide-react';
 import { VideoIdea } from '../types';
 import { ProfileId, PROFILES } from '../firebase';
 import { IdeaCardRow } from './ideas/IdeaCardRow';
@@ -7,7 +7,7 @@ import { IdeaCreateForm } from './ideas/IdeaCreateForm';
 
 interface IdeasModuleProps {
   theme: 'dark' | 'light';
-  activeProfile: ProfileId;
+  ownProfile: ProfileId;
   ideas: VideoIdea[];
   onAddIdea: (input: {
     sourceType: 'url' | 'upload';
@@ -31,7 +31,7 @@ interface IdeasModuleProps {
 
 export const IdeasModule: React.FC<IdeasModuleProps> = ({
   theme,
-  activeProfile,
+  ownProfile,
   ideas,
   onAddIdea,
   onUpdateIdea,
@@ -63,14 +63,25 @@ export const IdeasModule: React.FC<IdeasModuleProps> = ({
               <Lightbulb className="w-4 h-4" />
             </div>
             <h1 className="text-base sm:text-lg font-bold">
-              Ideas de Videos ({PROFILES[activeProfile].name})
+              Mis Ideas ({PROFILES[ownProfile].name})
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-red-600/15 border border-red-500/30 text-red-400 text-xs font-bold tabular-nums">
               {ideas.length} {ideas.length === 1 ? 'Idea' : 'Ideas'}
             </span>
+            <span
+              className={`px-2 py-0.5 rounded-md text-[11px] font-medium inline-flex items-center gap-1 ${
+                isLight
+                  ? 'bg-neutral-100 text-neutral-600'
+                  : 'bg-neutral-800/80 text-neutral-400'
+              }`}
+              title="Esta sección es privada para tu usuario y no cambia al alternar perfiles"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Vista personal</span>
+            </span>
           </div>
           <p className="text-xs text-neutral-500">
-            Guarda ideas para tus próximos videos combinando 1 miniatura (por URL de YouTube o imagen subida) + 4 opciones de títulos editables y notas.
+            Tus ideas privadas para futuros videos: 1 miniatura a la izquierda, 4 opciones de títulos en el centro y nota rápida a la derecha.
           </p>
         </div>
 
@@ -153,12 +164,12 @@ export const IdeasModule: React.FC<IdeasModuleProps> = ({
             <h3 className="text-sm font-semibold">
               {searchQuery
                 ? 'No se encontraron ideas con esa búsqueda'
-                : `Todavía no hay ideas guardadas en ${PROFILES[activeProfile].name}`}
+                : `Todavía no tienes ideas guardadas, ${PROFILES[ownProfile].name}`}
             </h3>
             <p className="text-xs text-neutral-500 max-w-md mx-auto">
               {searchQuery
                 ? 'Prueba con otros términos o limpia el buscador.'
-                : 'Agrega tu primera idea pegando una URL de YouTube (se autocompletará el primer título) o subiendo una imagen con tus 4 variaciones de título.'}
+                : 'Agrega tu primera idea pegando una URL de YouTube (se autocompletará el primer título) o subiendo una imagen con tus 4 variaciones de título y nota.'}
             </p>
           </div>
           {!searchQuery && !isCreatorOpen && (

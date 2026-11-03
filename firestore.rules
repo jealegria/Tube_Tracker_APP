@@ -27,6 +27,13 @@ service cloud.firestore {
       return profileId == 'johnny' || profileId == 'guido';
     }
 
+    function isOwnProfile(profileId) {
+      return isAuthorizedUser() && (
+        (profileId == 'johnny' && request.auth.token.email == 'hivitro93@gmail.com') ||
+        (profileId == 'guido' && request.auth.token.email == 'gazzolagrinstein@gmail.com')
+      );
+    }
+
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -186,15 +193,13 @@ service cloud.firestore {
     }
 
     match /profiles/{profileId}/ideas/{ideaId} {
-      allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
-      allow create: if isAuthorizedUser() &&
-                       isValidProfileId(profileId) &&
+      allow get, list: if isOwnProfile(profileId);
+      allow create: if isOwnProfile(profileId) &&
                        isValidId(ideaId) &&
                        incoming().keys().hasAll(['id', 'profileId', 'sourceType', 'thumbnailUrl', 'titles', 'createdAt', 'updatedAt']) &&
                        incoming().keys().hasOnly(['id', 'profileId', 'userId', 'sourceType', 'videoUrl', 'videoId', 'thumbnailUrl', 'titles', 'notes', 'createdAt', 'updatedAt']) &&
                        isValidVideoIdea(incoming(), profileId);
-      allow update: if isAuthorizedUser() &&
-                       isValidProfileId(profileId) &&
+      allow update: if isOwnProfile(profileId) &&
                        isValidId(ideaId) &&
                        incoming().id == existing().id &&
                        incoming().profileId == existing().profileId &&
@@ -202,7 +207,7 @@ service cloud.firestore {
                        incoming().keys().hasAll(['id', 'profileId', 'sourceType', 'thumbnailUrl', 'titles', 'createdAt', 'updatedAt']) &&
                        incoming().keys().hasOnly(['id', 'profileId', 'userId', 'sourceType', 'videoUrl', 'videoId', 'thumbnailUrl', 'titles', 'notes', 'createdAt', 'updatedAt']) &&
                        isValidVideoIdea(incoming(), profileId);
-      allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && isValidId(ideaId);
+      allow delete: if isOwnProfile(profileId) && isValidId(ideaId);
     }
 
     match /users/{userId}/packagings/{packagingId} {

@@ -51,7 +51,6 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
 
   const [localTitles, setLocalTitles] = useState<[string, string, string, string]>(idea.titles);
   const [localNotes, setLocalNotes] = useState<string>(idea.notes || '');
-  const [isNotesOpen, setIsNotesOpen] = useState<boolean>(Boolean(idea.notes));
   const [savedIndicator, setSavedIndicator] = useState<number | 'notes' | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -72,7 +71,6 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
 
   useEffect(() => {
     setLocalNotes(idea.notes || '');
-    if (idea.notes) setIsNotesOpen(true);
   }, [idea.notes]);
 
   useEffect(() => {
@@ -238,22 +236,6 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setIsNotesOpen((v) => !v)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-              isNotesOpen || idea.notes
-                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                : isLight
-                ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 border border-neutral-800'
-            }`}
-            title="Agregar o editar nota de esta idea"
-          >
-            <StickyNote className="w-3.5 h-3.5" />
-            <span>{idea.notes ? 'Nota' : '+ Nota'}</span>
-          </button>
-
           {confirmDelete ? (
             <div className="flex items-center gap-1 bg-red-950/50 border border-red-500/40 rounded-lg px-2 py-0.5">
               <span className="text-[11px] text-red-300 font-medium">¿Borrar?</span>
@@ -289,9 +271,13 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
         </div>
       </div>
 
-      {/* Main Sketch Layout: Left = 16:9 Thumbnail, Right = 4 Stacked Editable Title Boxes */}
-      <div className="flex flex-col lg:flex-row items-stretch gap-4">
-        {/* 1. Left Side: Thumbnail (Blue Rectangle in Sketch) */}
+      {/* 3-Column Sketch Layout:
+          1. Left (Blue Rectangle): 16:9 Thumbnail (same size as before)
+          2. Middle (4 Yellow Rectangles): Shorter 4 stacked title boxes (truncated if long)
+          3. Right (Red Square): Side Note box matching the height of the row
+      */}
+      <div className="flex flex-col lg:flex-row items-stretch gap-3.5">
+        {/* 1. Left Side: Thumbnail (same size: w-full lg:w-[360px] xl:w-[400px]) */}
         <div className="w-full lg:w-[360px] xl:w-[400px] shrink-0 flex flex-col">
           <div
             onClick={() => {
@@ -469,8 +455,8 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
           </div>
         </div>
 
-        {/* 2. Right Side: 4 Editable Title Text Boxes (4 Yellow Rectangles in Sketch) */}
-        <div className="flex-1 flex flex-col justify-between gap-2.5">
+        {/* 2. Middle: 4 Shorter Editable Title Boxes (4 Yellow Rectangles in Sketch) */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between gap-2.5">
           {[0, 1, 2, 3].map((slotIdx) => {
             const val = localTitles[slotIdx] || '';
             const isSaved = savedIndicator === slotIdx;
@@ -479,7 +465,7 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
             return (
               <div
                 key={slotIdx}
-                className={`group/title relative flex items-center rounded-xl border transition-all flex-1 min-h-[46px] px-3 py-1.5 ${
+                className={`group/title relative flex items-center rounded-xl border transition-all flex-1 min-h-[44px] px-3 py-1.5 ${
                   val.trim()
                     ? isLight
                       ? 'bg-amber-50/60 border-amber-300/80 focus-within:border-amber-500 focus-within:bg-white'
@@ -504,6 +490,7 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
                 <input
                   type="text"
                   value={val}
+                  title={val || undefined}
                   onChange={(e) => handleTitleChange(slotIdx, e.target.value)}
                   onBlur={() => void commitTitle(slotIdx)}
                   onKeyDown={(e) => {
@@ -513,85 +500,92 @@ export const IdeaCardRow: React.FC<IdeaCardRowProps> = ({
                   }}
                   placeholder={
                     slotIdx === 0 && idea.sourceType === 'url'
-                      ? 'Título 1 (obtenido del URL o escribe tu variación)...'
-                      : `Escribir opción de título #${slotIdx + 1}...`
+                      ? 'Título 1 (del URL)...'
+                      : `Título #${slotIdx + 1}...`
                   }
-                  className={`w-full bg-transparent text-xs sm:text-sm font-medium outline-none pr-16 ${
+                  className={`w-full bg-transparent text-xs sm:text-sm font-medium outline-none pr-10 truncate focus:text-clip ${
                     isLight
                       ? 'text-neutral-900 placeholder:text-neutral-400'
                       : 'text-neutral-100 placeholder:text-neutral-500'
                   }`}
                 />
 
-                <div className="absolute right-2.5 flex items-center gap-1.5">
+                <div className="absolute right-2 flex items-center gap-1">
                   {isSaved && (
-                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center">
                       <Check className="w-3 h-3" />
                     </span>
                   )}
                   {val.trim().length > 0 && (
-                    <>
-                      <span
-                        className={`text-[10px] tabular-nums hidden sm:inline ${
-                          val.length > 70 ? 'text-amber-400' : 'text-neutral-500'
-                        }`}
-                      >
-                        {val.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyTitle(slotIdx)}
-                        className={`p-1 rounded-md opacity-0 group-hover/title:opacity-100 transition-opacity cursor-pointer ${
-                          isLight
-                            ? 'hover:bg-neutral-200 text-neutral-600'
-                            : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                        title="Copiar título"
-                      >
-                        {isCopied ? (
-                          <Check className="w-3 h-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyTitle(slotIdx)}
+                      className={`p-1 rounded-md opacity-0 group-hover/title:opacity-100 transition-opacity cursor-pointer ${
+                        isLight
+                          ? 'hover:bg-neutral-200 text-neutral-600'
+                          : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                      }`}
+                      title="Copiar título"
+                    >
+                      {isCopied ? (
+                        <Check className="w-3 h-3 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </button>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
-      </div>
 
-      {/* Expandable / Editable Note Area */}
-      {isNotesOpen && (
+        {/* 3. Right Side: Note Square Box (Red Square in Sketch) */}
         <div
-          className={`mt-3 pt-3 border-t flex items-start gap-2.5 ${
-            isLight ? 'border-neutral-200/80' : 'border-neutral-800/80'
+          className={`w-full lg:w-[230px] xl:w-[260px] shrink-0 rounded-xl border p-3 flex flex-col justify-between transition-all ${
+            localNotes.trim()
+              ? isLight
+                ? 'bg-red-50/50 border-red-200 focus-within:border-red-400 focus-within:bg-white'
+                : 'bg-red-500/[0.06] border-red-500/25 focus-within:border-red-500/60 focus-within:bg-neutral-900'
+              : isLight
+              ? 'bg-neutral-50 border-neutral-200 focus-within:border-neutral-400 focus-within:bg-white'
+              : 'bg-neutral-900/50 border-neutral-800/90 focus-within:border-neutral-600 focus-within:bg-neutral-900'
           }`}
         >
-          <StickyNote className="w-4 h-4 text-amber-400 shrink-0 mt-2" />
-          <div className="flex-1 relative">
-            <textarea
-              rows={2}
-              value={localNotes}
-              onChange={(e) => setLocalNotes(e.target.value)}
-              onBlur={() => void commitNotes()}
-              placeholder="Agrega notas sobre esta idea (ángulo del video, estructura del gancho, referencias visuales...)"
-              className={`w-full rounded-xl border px-3 py-2 text-xs outline-none resize-y transition-colors ${
-                isLight
-                  ? 'bg-neutral-50 border-neutral-200 focus:border-amber-500 text-neutral-800 placeholder:text-neutral-400'
-                  : 'bg-neutral-900/70 border-neutral-800 focus:border-amber-500/60 text-neutral-200 placeholder:text-neutral-500'
+          <div className="flex items-center justify-between gap-1.5 mb-1.5">
+            <span
+              className={`text-[11px] font-semibold flex items-center gap-1 ${
+                localNotes.trim()
+                  ? 'text-red-400'
+                  : isLight
+                  ? 'text-neutral-500'
+                  : 'text-neutral-400'
               }`}
-            />
+            >
+              <StickyNote className="w-3 h-3" />
+              <span>Nota</span>
+            </span>
             {savedIndicator === 'notes' && (
-              <span className="absolute right-2.5 bottom-2.5 text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                <Check className="w-3 h-3" /> Guardado
+              <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
+                <Check className="w-3 h-3" />
+                <span>Guardado</span>
               </span>
             )}
           </div>
+
+          <textarea
+            value={localNotes}
+            onChange={(e) => setLocalNotes(e.target.value)}
+            onBlur={() => void commitNotes()}
+            placeholder="Escribir nota breve..."
+            className={`w-full flex-1 min-h-[90px] lg:min-h-0 bg-transparent text-xs leading-relaxed outline-none resize-none ${
+              isLight
+                ? 'text-neutral-800 placeholder:text-neutral-400'
+                : 'text-neutral-200 placeholder:text-neutral-500'
+            }`}
+          />
         </div>
-      )}
+      </div>
     </article>
   );
 };
