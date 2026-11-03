@@ -5,6 +5,7 @@ import {
   FolderKanban,
   Tv,
   FlaskConical,
+  Lightbulb,
   Database,
   Settings,
   Sun,
@@ -63,6 +64,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       id: 'testing',
       label: 'Testing',
       icon: FlaskConical,
+    },
+    {
+      id: 'ideas',
+      label: 'Ideas',
+      icon: Lightbulb,
     },
     {
       id: 'datos',

@@ -7,12 +7,16 @@ import {
   X,
   Download,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
 } from 'lucide-react';
 import { UserVideoPack } from '../../types';
 import { compressThumbnailFile } from '../../utils/imageCompression';
 
 export interface PackSlotCardProps {
   slotIndex: number;
+  maxSlots: number;
   videoId: string;
   existingPack?: UserVideoPack;
   theme: 'dark' | 'light';
@@ -25,16 +29,23 @@ export interface PackSlotCardProps {
     existingPackId?: string
   ) => Promise<void>;
   onDeletePack: (packId: string) => Promise<void>;
+  onMoveToSlot: (targetSlotIndex: number) => Promise<void>;
+  onDragStartSlot?: () => void;
+  onDragEndSlot?: () => void;
 }
 
 export const PackSlotCard: React.FC<PackSlotCardProps> = ({
   slotIndex,
+  maxSlots,
   videoId,
   existingPack,
   theme,
   channelName,
   onSavePack,
   onDeletePack,
+  onMoveToSlot,
+  onDragStartSlot,
+  onDragEndSlot,
 }) => {
   const isLight = theme === 'light';
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,7 +171,15 @@ export const PackSlotCard: React.FC<PackSlotCardProps> = ({
   if (existingPack && !isEditing) {
     return (
       <div
-        className={`rounded-2xl border overflow-hidden flex flex-col justify-between transition-all ${
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          onDragStartSlot?.();
+        }}
+        onDragEnd={() => {
+          onDragEndSlot?.();
+        }}
+        className={`h-full rounded-2xl border overflow-hidden flex flex-col justify-between transition-all ${
           isLight
             ? 'bg-white border-neutral-200 shadow-xs'
             : 'bg-neutral-900/60 border-neutral-800/90'
@@ -173,17 +192,52 @@ export const PackSlotCard: React.FC<PackSlotCardProps> = ({
               alt={existingPack.title}
               className="w-full h-full object-cover"
             />
-            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded-lg bg-red-600 text-white text-[11px] font-bold shadow-sm">
-                Pack #{slotIndex + 1} ({packLetter})
-              </span>
+            <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-600 text-white text-[11px] font-bold shadow-sm cursor-grab active:cursor-grabbing" title="Arrastra para mover este pack a otra posición">
+                <GripVertical className="w-3 h-3 opacity-80" />
+                <span>Pack #{slotIndex + 1} ({packLetter})</span>
+              </div>
+
+              {/* Quick Reorder Controls (Prev / Position Selector / Next) */}
+              <div className="flex items-center gap-0.5 bg-black/80 backdrop-blur-xs rounded-lg p-0.5 border border-white/15">
+                <button
+                  type="button"
+                  disabled={slotIndex === 0}
+                  onClick={() => void onMoveToSlot(slotIndex - 1)}
+                  className="p-1 rounded text-white hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                  title="Mover una posición atrás"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <select
+                  value={slotIndex}
+                  onChange={(e) => void onMoveToSlot(Number(e.target.value))}
+                  className="bg-transparent text-white text-[10px] font-bold outline-none px-1 cursor-pointer"
+                  title="Mover directamente a otra posición"
+                >
+                  {Array.from({ length: maxSlots }).map((_, i) => (
+                    <option key={i} value={i} className="bg-neutral-900 text-white">
+                      #{i + 1} ({String.fromCharCode(65 + i)})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={slotIndex === maxSlots - 1}
+                  onClick={() => void onMoveToSlot(slotIndex + 1)}
+                  className="p-1 rounded text-white hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                  title="Mover una posición adelante"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none">
               <button
                 type="button"
                 onClick={startEditing}
-                className="px-3 py-1.5 rounded-xl bg-white text-neutral-950 text-xs font-semibold flex items-center gap-1.5 hover:bg-neutral-200 transition-colors cursor-pointer shadow"
+                className="pointer-events-auto px-3 py-1.5 rounded-xl bg-white text-neutral-950 text-xs font-semibold flex items-center gap-1.5 hover:bg-neutral-200 transition-colors cursor-pointer shadow"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 <span>Editar Pack</span>
@@ -191,7 +245,7 @@ export const PackSlotCard: React.FC<PackSlotCardProps> = ({
               <button
                 type="button"
                 onClick={handleDownloadThumbnail}
-                className="p-2 rounded-xl bg-neutral-900/90 text-white hover:bg-neutral-800 transition-colors cursor-pointer shadow"
+                className="pointer-events-auto p-2 rounded-xl bg-neutral-900/90 text-white hover:bg-neutral-800 transition-colors cursor-pointer shadow"
                 title="Descargar miniatura a tu PC"
               >
                 <Download className="w-4 h-4" />
@@ -232,36 +286,65 @@ export const PackSlotCard: React.FC<PackSlotCardProps> = ({
             }`}
           >
             <Pencil className="w-3.5 h-3.5 text-red-500" />
-            <span>Editar imagen o título</span>
+            <span>Editar</span>
           </button>
 
-          {confirmDelete ? (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => void handleConfirmDelete()}
-                className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[11px] font-semibold cursor-pointer"
-              >
-                Confirmar
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="p-1 text-neutral-400 hover:text-neutral-200 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="p-1.5 rounded-lg text-neutral-500 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-              title="Eliminar este pack"
+              disabled={slotIndex === 0}
+              onClick={() => void onMoveToSlot(slotIndex - 1)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 ${
+                isLight
+                  ? 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-200/70'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              }`}
+              title="Mover a la izquierda"
             >
-              <Trash2 className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          )}
+            <button
+              type="button"
+              disabled={slotIndex === maxSlots - 1}
+              onClick={() => void onMoveToSlot(slotIndex + 1)}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 ${
+                isLight
+                  ? 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-200/70'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              }`}
+              title="Mover a la derecha"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {confirmDelete ? (
+              <div className="flex items-center gap-1 ml-1">
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmDelete()}
+                  className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[11px] font-semibold cursor-pointer"
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="p-1 text-neutral-400 hover:text-neutral-200 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="p-1.5 rounded-lg text-neutral-500 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                title="Eliminar este pack"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

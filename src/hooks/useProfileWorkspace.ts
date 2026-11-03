@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { PackagingItem, UserVideoFolder, UserVideoPack } from '../types';
+import { PackagingItem, UserVideoFolder, UserVideoPack, VideoIdea } from '../types';
 import { DEFAULT_TAGS, INITIAL_SAMPLE_PACKAGINGS } from '../utils/youtube';
 import { parseShareUrl } from '../utils/shareUrl';
 import {
@@ -19,7 +19,11 @@ import {
   deleteProfileMyVideo,
   subscribeToProfileMyVideoPacks,
   saveProfileMyVideoPack,
+  batchSaveProfileMyVideoPacks,
   deleteProfileMyVideoPack,
+  subscribeToProfileIdeas,
+  saveProfileIdea,
+  deleteProfileIdea,
   migrateItemsToProfile,
   checkAndMigrateLegacyUserCollection,
 } from '../firebase';
@@ -28,6 +32,7 @@ const getStorageKey = (profileId: ProfileId) => `tubeswipe_packagings_${profileI
 const getCategoriesKey = (profileId: ProfileId) => `tubeswipe_categories_${profileId}_v1`;
 const getTagsKey = (profileId: ProfileId) => `tubeswipe_tags_${profileId}_v1`;
 const getChannelKey = (profileId: ProfileId) => `tubeswipe_channel_${profileId}_v1`;
+const getIdeasKey = (profileId: ProfileId) => `tubeswipe_ideas_${profileId}_v1`;
 
 const LEGACY_STORAGE_KEY = 'tubeswipe_packagings_v3';
 const LEGACY_CATEGORIES_KEY = 'tubeswipe_categories_v1';
@@ -49,6 +54,7 @@ export function useProfileWorkspace() {
 
   const [myVideos, setMyVideos] = useState<UserVideoFolder[]>([]);
   const [myVideoPacks, setMyVideoPacks] = useState<UserVideoPack[]>([]);
+  const [ideas, setIdeas] = useState<VideoIdea[]>([]);
 
   const [sharedBannerCount, setSharedBannerCount] = useState<number | null>(null);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
@@ -212,11 +218,39 @@ export function useProfileWorkspace() {
       setMyVideoPacks(packs);
     });
 
+    const loadLocalIdeasFallback = (prof: ProfileId): VideoIdea[] => {
+      try {
+        const saved = localStorage.getItem(getIdeasKey(prof));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {
+        // Ignore storage errors
+      }
+      return [];
+    };
+
+    const unsubIdeas = subscribeToProfileIdeas(
+      activeProfile,
+      (cloudIdeas) => {
+        if (cloudIdeas.length > 0) {
+          setIdeas(cloudIdeas);
+        } else {
+          setIdeas(loadLocalIdeasFallback(activeProfile));
+        }
+      },
+      () => {
+        setIdeas(loadLocalIdeasFallback(activeProfile));
+      }
+    );
+
     return () => {
       unsubPackagings();
       unsubPrefs();
       unsubMyVideos();
       unsubMyVideoPacks();
+      unsubIdeas();
     };
   }, [user, isAuthorized, activeProfile, ownProfile]);
 
@@ -239,6 +273,15 @@ export function useProfileWorkspace() {
     if (!isAuthorized) return;
     localStorage.setItem(getChannelKey(activeProfile), defaultChannelName);
   }, [defaultChannelName, activeProfile, isAuthorized]);
+
+  useEffect(() => {
+    if (!isAuthorized) return;
+    try {
+      localStorage.setItem(getIdeasKey(activeProfile), JSON.stringify(ideas));
+    } catch {
+      // Ignore quota errors if dataUrls are large
+    }
+  }, [ideas, activeProfile, isAuthorized]);
 
   const addPackaging = async (newItem: PackagingItem) => {
     setPackagings((prev) => [newItem, ...prev]);
@@ -479,7 +522,7 @@ export function useProfileWorkspace() {
       videoId,
       title: title.trim().slice(0, 500),
       thumbnailUrl,
-      order: Math.max(0, Math.min(4, orderIndex)),
+      order: Math.max(0, Math.min(5, orderIndex)),
       createdAt: existing ? existing.createdAt : now,
       updatedAt: now,
     };
@@ -505,6 +548,164 @@ export function useProfileWorkspace() {
     setMyVideoPacks((prev) => prev.filter((p) => p.id !== packId));
     if (user && isAuthorized) {
       await deleteProfileMyVideoPack(activeProfile, packId);
+    }
+  };
+
+  const moveMyVideoPackSlot = async (
+    videoId: string,
+    fromSlotIndex: number,
+    toSlotIndex: number
+  ) => {
+    if (fromSlotIndex === toSlotIndex) return;
+    if (toSlotIndex < 0 || toSlotIndex > 5) return;
+
+    const folderPacks = myVideoPacks.filter((p) => p.videoId === videoId);
+    const sourcePack = folderPacks.find((p) => p.order === fromSlotIndex);
+    if (!sourcePack) return;
+
+    const targetPack = folderPacks.find((p) => p.order === toSlotIndex);
+    const now = Date.now();
+
+    const updatedPacks: UserVideoPack[] = [];
+    const updatedSource: UserVideoPack = {
+      ...sourcePack,
+      order: toSlotIndex,
+      updatedAt: now,
+    };
+    updatedPacks.push(updatedSource);
+
+    if (targetPack) {
+      const updatedTarget: UserVideoPack = {
+        ...targetPack,
+        order: fromSlotIndex,
+        updatedAt: now,
+      };
+      updatedPacks.push(updatedTarget);
+    }
+
+    const updatedIds = new Set(updatedPacks.map((u) => u.id));
+    setMyVideoPacks((prev) => {
+      const rest = prev.filter((p) => !updatedIds.has(p.id));
+      return [...rest, ...updatedPacks].sort(
+        (a, b) => a.order - b.order || a.createdAt - b.createdAt
+      );
+    });
+
+    if (user && isAuthorized) {
+      await batchSaveProfileMyVideoPacks(activeProfile, updatedPacks);
+    }
+  };
+
+  const compactMyVideoPacks = async (videoId: string) => {
+    const folderPacks = myVideoPacks
+      .filter((p) => p.videoId === videoId)
+      .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+
+    if (folderPacks.length === 0) return;
+
+    const now = Date.now();
+    const changedPacks: UserVideoPack[] = [];
+    const reindexed = folderPacks.map((pack, idx) => {
+      if (pack.order !== idx) {
+        const updated = { ...pack, order: idx, updatedAt: now };
+        changedPacks.push(updated);
+        return updated;
+      }
+      return pack;
+    });
+
+    if (changedPacks.length === 0) return;
+
+    setMyVideoPacks((prev) => {
+      const others = prev.filter((p) => p.videoId !== videoId);
+      return [...others, ...reindexed].sort(
+        (a, b) => a.order - b.order || a.createdAt - b.createdAt
+      );
+    });
+
+    if (user && isAuthorized) {
+      await batchSaveProfileMyVideoPacks(activeProfile, changedPacks);
+    }
+  };
+
+  // ==========================================
+  // IDEAS CRUD ACTIONS (Thumbnail + 4 Titles + Notes)
+  // ==========================================
+
+  const addIdea = async (input: {
+    sourceType: 'url' | 'upload';
+    videoUrl?: string;
+    videoId?: string;
+    thumbnailUrl: string;
+    titles: [string, string, string, string];
+    notes?: string;
+  }): Promise<VideoIdea> => {
+    const now = Date.now();
+    const newIdea: VideoIdea = {
+      id: `idea-${now}-${Math.random().toString(36).slice(2, 7)}`,
+      profileId: activeProfile,
+      sourceType: input.sourceType,
+      videoUrl: input.videoUrl?.trim() || undefined,
+      videoId: input.videoId?.trim() || undefined,
+      thumbnailUrl: input.thumbnailUrl,
+      titles: [
+        (input.titles[0] || '').slice(0, 500),
+        (input.titles[1] || '').slice(0, 500),
+        (input.titles[2] || '').slice(0, 500),
+        (input.titles[3] || '').slice(0, 500),
+      ],
+      notes: input.notes?.trim().slice(0, 2000) || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setIdeas((prev) => [newIdea, ...prev]);
+    if (user && isAuthorized) {
+      await saveProfileIdea(activeProfile, newIdea);
+    }
+    return newIdea;
+  };
+
+  const updateIdea = async (
+    ideaId: string,
+    patch: Partial<
+      Pick<VideoIdea, 'sourceType' | 'videoUrl' | 'videoId' | 'thumbnailUrl' | 'titles' | 'notes'>
+    >
+  ) => {
+    const target = ideas.find((i) => i.id === ideaId);
+    if (!target) return;
+
+    const now = Date.now();
+    const updatedTitles: [string, string, string, string] = patch.titles
+      ? [
+          (patch.titles[0] || '').slice(0, 500),
+          (patch.titles[1] || '').slice(0, 500),
+          (patch.titles[2] || '').slice(0, 500),
+          (patch.titles[3] || '').slice(0, 500),
+        ]
+      : target.titles;
+
+    const updated: VideoIdea = {
+      ...target,
+      ...patch,
+      titles: updatedTitles,
+      notes:
+        patch.notes !== undefined
+          ? patch.notes.trim().slice(0, 2000) || undefined
+          : target.notes,
+      updatedAt: now,
+    };
+
+    setIdeas((prev) => prev.map((item) => (item.id === ideaId ? updated : item)));
+    if (user && isAuthorized) {
+      await saveProfileIdea(activeProfile, updated);
+    }
+  };
+
+  const removeIdea = async (ideaId: string) => {
+    setIdeas((prev) => prev.filter((item) => item.id !== ideaId));
+    if (user && isAuthorized) {
+      await deleteProfileIdea(activeProfile, ideaId);
     }
   };
 
@@ -580,6 +781,12 @@ export function useProfileWorkspace() {
     deleteMyVideoFolder,
     upsertMyVideoPack,
     removeMyVideoPack,
+    moveMyVideoPackSlot,
+    compactMyVideoPacks,
+    ideas,
+    addIdea,
+    updateIdea,
+    removeIdea,
     sharedBannerCount,
     setSharedBannerCount,
     statusBanner,

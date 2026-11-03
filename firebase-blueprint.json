@@ -126,7 +126,7 @@
     },
     "UserVideoPack": {
       "title": "UserVideoPack",
-      "description": "An uploaded custom pack (thumbnail + title) belonging to a UserVideoFolder (up to 5 per video)",
+      "description": "An uploaded custom pack (thumbnail + title) belonging to a UserVideoFolder (up to 6 per video)",
       "type": "object",
       "properties": {
         "id": {
@@ -160,7 +160,7 @@
         },
         "order": {
           "type": "number",
-          "description": "Slot index of the pack within the video folder (0 to 4)"
+          "description": "Slot index of the pack within the video folder (0 to 5)"
         },
         "createdAt": {
           "type": "number",
@@ -172,6 +172,65 @@
         }
       },
       "required": ["id", "profileId", "videoId", "title", "thumbnailUrl", "order", "createdAt", "updatedAt"]
+    },
+    "VideoIdea": {
+      "title": "VideoIdea",
+      "description": "A future video idea consisting of 1 thumbnail (from YouTube URL or uploaded image), 4 editable title variations, and optional notes",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique idea identifier",
+          "maxLength": 128
+        },
+        "profileId": {
+          "type": "string",
+          "description": "The profile identifier (johnny or guido)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who created or updated this idea",
+          "maxLength": 128
+        },
+        "sourceType": {
+          "type": "string",
+          "description": "Origin of the thumbnail: url or upload",
+          "enum": ["url", "upload"]
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "Optional YouTube URL if created from a link",
+          "maxLength": 500
+        },
+        "videoId": {
+          "type": "string",
+          "description": "Optional YouTube video ID if created from a link",
+          "maxLength": 64
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "Thumbnail URL or compressed Data URL",
+          "maxLength": 450000
+        },
+        "titles": {
+          "type": "array",
+          "description": "Array of 4 title variations for this idea"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes for this video idea",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Last update timestamp in milliseconds"
+        }
+      },
+      "required": ["id", "profileId", "sourceType", "thumbnailUrl", "titles", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -190,6 +249,10 @@
     "/profiles/{profileId}/myVideoPacks/{packId}": {
       "schema": "UserVideoPack",
       "description": "Profile-scoped custom packs (thumbnail + title, up to 5 per video folder) in Mis Videos"
+    },
+    "/profiles/{profileId}/ideas/{ideaId}": {
+      "schema": "VideoIdea",
+      "description": "Profile-scoped video ideas (thumbnail + 4 titles + notes) in Ideas tab"
     }
   }
 }

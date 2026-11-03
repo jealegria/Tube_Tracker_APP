@@ -89,10 +89,28 @@ service cloud.firestore {
              data.videoId is string && data.videoId.size() > 0 && data.videoId.size() <= 128 &&
              data.title is string && data.title.size() > 0 && data.title.size() <= 500 &&
              data.thumbnailUrl is string && data.thumbnailUrl.size() > 0 && data.thumbnailUrl.size() <= 450000 &&
-             data.order is number && data.order >= 0 && data.order < 5 &&
+             data.order is number && data.order >= 0 && data.order < 6 &&
              data.createdAt is number &&
              data.updatedAt is number &&
              (!('userId' in data) || (data.userId is string && data.userId.size() <= 128));
+    }
+
+    function isValidVideoIdea(data, profileId) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.profileId is string && data.profileId == profileId &&
+             (data.sourceType == 'url' || data.sourceType == 'upload') &&
+             data.thumbnailUrl is string && data.thumbnailUrl.size() > 0 && data.thumbnailUrl.size() <= 450000 &&
+             data.titles is list && data.titles.size() == 4 &&
+             data.titles[0] is string && data.titles[0].size() <= 500 &&
+             data.titles[1] is string && data.titles[1].size() <= 500 &&
+             data.titles[2] is string && data.titles[2].size() <= 500 &&
+             data.titles[3] is string && data.titles[3].size() <= 500 &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             (!('userId' in data) || (data.userId is string && data.userId.size() <= 128)) &&
+             (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() <= 500)) &&
+             (!('videoId' in data) || (data.videoId is string && data.videoId.size() <= 64)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
     }
 
     match /profiles/{profileId}/packagings/{packagingId} {
@@ -165,6 +183,26 @@ service cloud.firestore {
                        incoming().keys().hasOnly(['id', 'profileId', 'userId', 'videoId', 'title', 'thumbnailUrl', 'order', 'createdAt', 'updatedAt']) &&
                        isValidUserVideoPack(incoming(), profileId);
       allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && isValidId(packId);
+    }
+
+    match /profiles/{profileId}/ideas/{ideaId} {
+      allow get, list: if isAuthorizedUser() && isValidProfileId(profileId);
+      allow create: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(ideaId) &&
+                       incoming().keys().hasAll(['id', 'profileId', 'sourceType', 'thumbnailUrl', 'titles', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'sourceType', 'videoUrl', 'videoId', 'thumbnailUrl', 'titles', 'notes', 'createdAt', 'updatedAt']) &&
+                       isValidVideoIdea(incoming(), profileId);
+      allow update: if isAuthorizedUser() &&
+                       isValidProfileId(profileId) &&
+                       isValidId(ideaId) &&
+                       incoming().id == existing().id &&
+                       incoming().profileId == existing().profileId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasAll(['id', 'profileId', 'sourceType', 'thumbnailUrl', 'titles', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['id', 'profileId', 'userId', 'sourceType', 'videoUrl', 'videoId', 'thumbnailUrl', 'titles', 'notes', 'createdAt', 'updatedAt']) &&
+                       isValidVideoIdea(incoming(), profileId);
+      allow delete: if isAuthorizedUser() && isValidProfileId(profileId) && isValidId(ideaId);
     }
 
     match /users/{userId}/packagings/{packagingId} {

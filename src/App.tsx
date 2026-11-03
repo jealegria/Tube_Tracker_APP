@@ -21,6 +21,7 @@ import { TestingModule } from './components/ABTestingModule';
 import { DataDashboardView } from './components/DataDashboardView';
 import { SettingsView } from './components/SettingsView';
 import { MyVideosModule } from './components/MyVideosModule';
+import { IdeasModule } from './components/IdeasModule';
 
 export function App() {
   const {
@@ -42,6 +43,12 @@ export function App() {
     deleteMyVideoFolder,
     upsertMyVideoPack,
     removeMyVideoPack,
+    moveMyVideoPackSlot,
+    compactMyVideoPacks,
+    ideas,
+    addIdea,
+    updateIdea,
+    removeIdea,
     sharedBannerCount,
     setSharedBannerCount,
     statusBanner,
@@ -267,6 +274,8 @@ export function App() {
               onDeleteVideoFolder={deleteMyVideoFolder}
               onUpsertVideoPack={upsertMyVideoPack}
               onDeleteVideoPack={removeMyVideoPack}
+              onMoveVideoPackSlot={moveMyVideoPackSlot}
+              onCompactVideoPacks={compactMyVideoPacks}
             />
           ) : activeModule === 'testing' ? (
             <TestingModule
@@ -276,6 +285,15 @@ export function App() {
               items={packagings}
               myVideos={myVideos}
               myVideoPacks={myVideoPacks}
+            />
+          ) : activeModule === 'ideas' ? (
+            <IdeasModule
+              theme={theme}
+              activeProfile={activeProfile}
+              ideas={ideas}
+              onAddIdea={addIdea}
+              onUpdateIdea={updateIdea}
+              onDeleteIdea={removeIdea}
             />
           ) : activeModule === 'preview' ? (
             <PackagingPreviewModule

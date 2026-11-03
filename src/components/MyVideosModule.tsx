@@ -22,10 +22,16 @@ interface MyVideosModuleProps {
     existingPackId?: string
   ) => Promise<void>;
   onDeleteVideoPack: (packId: string) => Promise<void>;
+  onMoveVideoPackSlot: (
+    videoId: string,
+    fromSlotIndex: number,
+    toSlotIndex: number
+  ) => Promise<void>;
+  onCompactVideoPacks: (videoId: string) => Promise<void>;
 }
 
 const MAX_VIDEOS = 10;
-const MAX_PACKS_PER_VIDEO = 5;
+const MAX_PACKS_PER_VIDEO = 6;
 
 export const MyVideosModule: React.FC<MyVideosModuleProps> = ({
   theme,
@@ -37,6 +43,8 @@ export const MyVideosModule: React.FC<MyVideosModuleProps> = ({
   onDeleteVideoFolder,
   onUpsertVideoPack,
   onDeleteVideoPack,
+  onMoveVideoPackSlot,
+  onCompactVideoPacks,
 }) => {
   const isLight = theme === 'light';
 
@@ -92,6 +100,8 @@ export const MyVideosModule: React.FC<MyVideosModuleProps> = ({
         onRenameFolder={onRenameVideoFolder}
         onUpsertPack={onUpsertVideoPack}
         onDeletePack={onDeleteVideoPack}
+        onMovePackSlot={onMoveVideoPackSlot}
+        onCompactPacks={onCompactVideoPacks}
       />
     );
   }

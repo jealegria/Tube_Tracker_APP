@@ -30,6 +30,19 @@ export interface UserVideoFolder {
   updatedAt: number;
 }
 
+export interface VideoIdea {
+  id: string;
+  profileId: string;
+  sourceType: 'url' | 'upload';
+  videoUrl?: string;
+  videoId?: string;
+  thumbnailUrl: string;
+  titles: [string, string, string, string];
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type CategoryFilter = 'Todas' | string;
 
 export type SortOrder = 'newest' | 'oldest' | 'alpha';
@@ -39,5 +52,7 @@ export type ActiveModule =
   | 'misvideos'
   | 'preview'
   | 'testing'
+  | 'ideas'
   | 'datos'
   | 'settings';
+

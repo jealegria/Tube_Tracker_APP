@@ -18,7 +18,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { PackagingItem, UserVideoFolder, UserVideoPack } from './types';
+import { PackagingItem, UserVideoFolder, UserVideoPack, VideoIdea } from './types';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -474,7 +474,7 @@ export async function saveProfileMyVideoPack(
   const docPath = `profiles/${profileId}/myVideoPacks/${pack.id}`;
   try {
     const docRef = doc(db, 'profiles', profileId, 'myVideoPacks', pack.id);
-    const safeOrder = Math.max(0, Math.min(4, Math.floor(pack.order)));
+    const safeOrder = Math.max(0, Math.min(5, Math.floor(pack.order)));
     const payload = {
       id: pack.id.slice(0, 128),
       profileId,
@@ -492,6 +492,35 @@ export async function saveProfileMyVideoPack(
   }
 }
 
+export async function batchSaveProfileMyVideoPacks(
+  profileId: ProfileId,
+  packs: UserVideoPack[]
+): Promise<void> {
+  if (packs.length === 0) return;
+  const colPath = `profiles/${profileId}/myVideoPacks`;
+  try {
+    const batch = writeBatch(db);
+    for (const pack of packs) {
+      const docRef = doc(db, 'profiles', profileId, 'myVideoPacks', pack.id);
+      const safeOrder = Math.max(0, Math.min(5, Math.floor(pack.order)));
+      batch.set(docRef, {
+        id: pack.id.slice(0, 128),
+        profileId,
+        userId: auth.currentUser?.uid || '',
+        videoId: pack.videoId.slice(0, 128),
+        title: pack.title.trim().slice(0, 500) || 'Sin título',
+        thumbnailUrl: pack.thumbnailUrl.slice(0, 450000),
+        order: safeOrder,
+        createdAt: pack.createdAt || Date.now(),
+        updatedAt: pack.updatedAt || Date.now(),
+      });
+    }
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, colPath);
+  }
+}
+
 export async function deleteProfileMyVideoPack(
   profileId: ProfileId,
   packId: string
@@ -499,6 +528,100 @@ export async function deleteProfileMyVideoPack(
   const docPath = `profiles/${profileId}/myVideoPacks/${packId}`;
   try {
     await deleteDoc(doc(db, 'profiles', profileId, 'myVideoPacks', packId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, docPath);
+  }
+}
+
+// ==========================================
+// IDEAS: Cloud Video Ideas (Thumbnail + 4 Titles + Notes)
+// ==========================================
+
+export function subscribeToProfileIdeas(
+  profileId: ProfileId,
+  onSuccess: (ideas: VideoIdea[]) => void,
+  onError?: (err: unknown) => void
+) {
+  const colPath = `profiles/${profileId}/ideas`;
+  const colRef = collection(db, 'profiles', profileId, 'ideas');
+
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const ideas: VideoIdea[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const rawTitles = Array.isArray(data.titles) ? data.titles : [];
+        const normalizedTitles: [string, string, string, string] = [
+          typeof rawTitles[0] === 'string' ? rawTitles[0] : '',
+          typeof rawTitles[1] === 'string' ? rawTitles[1] : '',
+          typeof rawTitles[2] === 'string' ? rawTitles[2] : '',
+          typeof rawTitles[3] === 'string' ? rawTitles[3] : '',
+        ];
+        ideas.push({
+          id: data.id || docSnap.id,
+          profileId: data.profileId || profileId,
+          sourceType: data.sourceType === 'upload' ? 'upload' : 'url',
+          videoUrl: typeof data.videoUrl === 'string' ? data.videoUrl : undefined,
+          videoId: typeof data.videoId === 'string' ? data.videoId : undefined,
+          thumbnailUrl: typeof data.thumbnailUrl === 'string' ? data.thumbnailUrl : '',
+          titles: normalizedTitles,
+          notes: typeof data.notes === 'string' ? data.notes : '',
+          createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
+          updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : Date.now(),
+        });
+      });
+      ideas.sort((a, b) => b.createdAt - a.createdAt);
+      onSuccess(ideas);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, colPath);
+      if (onError) onError(error);
+    }
+  );
+}
+
+export async function saveProfileIdea(
+  profileId: ProfileId,
+  idea: VideoIdea
+): Promise<void> {
+  const docPath = `profiles/${profileId}/ideas/${idea.id}`;
+  try {
+    const docRef = doc(db, 'profiles', profileId, 'ideas', idea.id);
+    const normalizedTitles: [string, string, string, string] = [
+      (idea.titles?.[0] || '').slice(0, 500),
+      (idea.titles?.[1] || '').slice(0, 500),
+      (idea.titles?.[2] || '').slice(0, 500),
+      (idea.titles?.[3] || '').slice(0, 500),
+    ];
+    const payload: Record<string, any> = {
+      id: idea.id.slice(0, 128),
+      profileId,
+      userId: auth.currentUser?.uid || '',
+      sourceType: idea.sourceType === 'upload' ? 'upload' : 'url',
+      thumbnailUrl: idea.thumbnailUrl.slice(0, 450000),
+      titles: normalizedTitles,
+      createdAt: idea.createdAt || Date.now(),
+      updatedAt: idea.updatedAt || Date.now(),
+    };
+    if (idea.videoUrl) payload.videoUrl = idea.videoUrl.slice(0, 500);
+    if (idea.videoId) payload.videoId = idea.videoId.slice(0, 64);
+    if (typeof idea.notes === 'string' && idea.notes.trim() !== '') {
+      payload.notes = idea.notes.slice(0, 2000);
+    }
+    await setDoc(docRef, payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, docPath);
+  }
+}
+
+export async function deleteProfileIdea(
+  profileId: ProfileId,
+  ideaId: string
+): Promise<void> {
+  const docPath = `profiles/${profileId}/ideas/${ideaId}`;
+  try {
+    await deleteDoc(doc(db, 'profiles', profileId, 'ideas', ideaId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, docPath);
   }
