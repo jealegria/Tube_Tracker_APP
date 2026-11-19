@@ -80,8 +80,24 @@ export const TestingModule: React.FC<TestingModuleProps> = ({
   }, [items, device, placement]);
 
   useEffect(() => {
-    shuffleContext();
-  }, [shuffleContext]);
+    const shuffled = fisherYatesShuffle(items).slice(0, 12);
+    setSurroundingItems(shuffled);
+
+    if (device === 'mobile') {
+      setUserPositionIndex(0);
+      return;
+    }
+
+    const maxPosByContext: Record<ABDeviceType, Record<ABPlacementMode, number>> = {
+      pc: { home: 5, sidebar: 3, fullscreen: 1 },
+      mobile: { home: 1, sidebar: 0, fullscreen: 1 },
+      tablet: { home: 3, sidebar: 2, fullscreen: 1 },
+      tv: { home: 1, sidebar: 2, fullscreen: 1 },
+    };
+
+    const maxPos = maxPosByContext[device][placement];
+    setUserPositionIndex(Math.floor(Math.random() * (maxPos + 1)));
+  }, [items, device, placement]);
 
   const handleAddQuickVariation = (title: string, thumbnailUrl: string) => {
     const letter = String.fromCharCode(65 + (quickVariations.length % 26));

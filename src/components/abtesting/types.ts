@@ -55,11 +55,12 @@ export const YOUTUBE_SPECS: Record<
   },
   mobile: {
     home: {
-      maxVisibleChars: 64,
-      charsPerLine: 32,
+      maxVisibleChars: 80,
+      charsPerLine: 40,
       maxLines: 2,
-      thumbRatio: '16:9 (390×219px full-bleed / 12px radius)',
-      description: 'YouTube Mobile App Home Feed · Roboto 14px Medium (line-height 18px)',
+      thumbRatio: '16:9 (1ra card completa + 2da miniatura entera sin datos)',
+      description:
+        'YouTube Mobile App Homepage · Título ancho completo + @canal/acciones + 2da miniatura visible debajo',
     },
     sidebar: {
       maxVisibleChars: 62,

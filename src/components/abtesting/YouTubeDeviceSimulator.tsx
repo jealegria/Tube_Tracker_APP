@@ -18,6 +18,7 @@ import {
   Settings,
   Maximize,
   Shuffle,
+  Bookmark,
 } from 'lucide-react';
 import { PackagingItem } from '../../types';
 import {
@@ -595,7 +596,7 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
         <div
           className={`w-[390px] max-w-full rounded-[38px] border-[6px] border-neutral-800 overflow-hidden shadow-2xl flex flex-col ${ytBg}`}
         >
-          {/* Mobile System Status Bar (12:11 · 5G · Battery 52) */}
+          {/* Mobile System Status Bar (08:08 · Mute · Wi-Fi · Signal · Battery 69) */}
           <div
             className={`h-8 px-5 flex items-center justify-between text-[12px] font-semibold select-none ${
               placement === 'sidebar'
@@ -605,118 +606,322 @@ export const YouTubeDeviceSimulator: React.FC<YouTubeDeviceSimulatorProps> = ({
                 : 'bg-[#0f0f0f] text-[#f1f1f1]'
             }`}
           >
-            <span className="tracking-tight">12:11</span>
+            <span className="tracking-tight tabular-nums">
+              {placement === 'home' ? '08:08' : '12:11'}
+            </span>
             <div className="flex items-center gap-1.5">
               {/* Mute / Vibrate bell slash */}
               <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 fill-current opacity-90">
                 <path d="M8 2a4 4 0 0 0-4 4v2.6L2.7 9.9A1 1 0 0 0 3.4 11.5h9.2a1 1 0 0 0 .7-1.6L12 8.6V6a4 4 0 0 0-4-4zm0 12a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2z" />
               </svg>
-              <span className="text-[10px] font-bold leading-none border border-current px-0.5 rounded-[2px]">
-                5G
-              </span>
+              {placement === 'home' ? (
+                /* Wi-Fi icon */
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-3.5 h-3.5 fill-none stroke-current stroke-[2.2] opacity-90"
+                >
+                  <path d="M5 12.55a11 11 0 0 1 14.08 0" strokeLinecap="round" />
+                  <path d="M8.53 16.11a6 6 0 0 1 6.95 0" strokeLinecap="round" />
+                  <circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none" />
+                </svg>
+              ) : (
+                <span className="text-[10px] font-bold leading-none border border-current px-0.5 rounded-[2px]">
+                  5G
+                </span>
+              )}
               {/* Signal bars */}
               <div className="flex items-end gap-[1.5px] h-3">
                 <span className="w-[2px] h-1.5 bg-current rounded-full" />
                 <span className="w-[2px] h-2 bg-current rounded-full" />
                 <span className="w-[2px] h-2.5 bg-current rounded-full" />
-                <span className="w-[2px] h-3 bg-current opacity-40 rounded-full" />
+                <span className="w-[2px] h-3 bg-current rounded-full" />
               </div>
-              {/* Battery pill with 52 */}
-              <span className="ml-0.5 px-1.5 py-[1px] rounded-full bg-current/20 text-[10px] font-bold tabular-nums">
-                52
+              {/* Battery pill */}
+              <span
+                className={`ml-0.5 px-1.5 py-[1px] rounded-full text-[10px] font-bold tabular-nums ${
+                  placement === 'home'
+                    ? isBright
+                      ? 'bg-[#0f0f0f] text-white'
+                      : 'bg-[#f1f1f1] text-[#0f0f0f]'
+                    : 'bg-current/20'
+                }`}
+              >
+                {placement === 'home' ? '69' : '52'}
               </span>
             </div>
           </div>
 
           {placement === 'home' ? (
-            /* MOBILE HOME FEED */
-            <>
-              {/* Mobile App Header */}
-              <div className={`h-11 px-3.5 border-b flex items-center justify-between ${ytBorder}`}>
-                <div className="flex items-center gap-1">
-                  <div className="w-6 h-4 rounded-[4px] bg-[#FF0000] flex items-center justify-center text-white">
-                    <Youtube className="w-3.5 h-3.5 fill-white" />
-                  </div>
-                  <span className="font-bold text-[16px] tracking-tighter">YouTube</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Bell className="w-5 h-5" />
-                  <Search className="w-5 h-5" />
-                </div>
-              </div>
+            /* MOBILE HOME FEED (Exact 2026 YouTube Mobile Homepage Layout: Underline Tabs + Full Card 1 + Full Thumbnail Card 2 without Channel/Data + Icon-Only Bottom Bar) */
+            (() => {
+              const formatMobileHandle = (name: string) => {
+                const trimmed = name.trim();
+                if (!trimmed) return '@Mi_Canal';
+                if (trimmed.startsWith('@')) return trimmed;
+                return `@${trimmed.replace(/\s+/g, '_')}`;
+              };
 
-              <div className="space-y-4 pb-4">
-                <div className="px-3 pt-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none">
-                  {['Todos', 'Novedades', 'Gaming', 'Podcasts'].map((chip, i) => (
-                    <span
-                      key={chip}
-                      className={`px-3 py-1 rounded-[8px] text-[13px] font-medium whitespace-nowrap ${
-                        i === 0 ? ytChipActive : ytChipIdle
-                      }`}
-                    >
-                      {chip}
-                    </span>
-                  ))}
-                </div>
+              const formatMobileTime = (rawTime: string) => {
+                const map: Record<string, string> = {
+                  '2h ago': 'hace 2 h',
+                  '8mo ago': 'hace 8 meses',
+                  '1mo ago': 'hace 1 mes',
+                  '2w ago': 'hace 2 sem',
+                  '1y ago': 'hace 1 año',
+                  '3d ago': 'hace 3 días',
+                  '5mo ago': 'hace 5 meses',
+                  '10d ago': 'hace 10 días',
+                };
+                return map[rawTime] || 'hace 15 h';
+              };
 
-                {cards.slice(0, 4).map((card) => (
-                  <div key={card.id} className="space-y-2.5">
-                    <div className="relative aspect-video w-full bg-neutral-900 overflow-hidden">
-                      {renderThumbImg(card)}
-                      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-[4px] bg-black/80 text-white text-[11px] font-medium tabular-nums">
-                        {card.duration}
+              const formatMobileViews = (rawViews: string) =>
+                rawViews.replace(/(\d)(K|M)$/i, '$1 $2');
+
+              const firstCard = cards[0];
+              const secondCard = cards[1];
+              const cardSurfaceBg = isBright ? 'bg-[#f2f2f2]' : 'bg-[#1c1c1c]';
+
+              return (
+                <div className="flex flex-col select-none">
+                  {/* Mobile App Header (YouTube Premium + Bell + Search, seamless no border) */}
+                  <div className="h-12 px-4 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-[26px] h-[18px] rounded-[5px] bg-[#FF0000] flex items-center justify-center text-white">
+                        <Youtube className="w-4 h-4 fill-white" />
                       </div>
+                      <span className="font-bold text-[18px] tracking-tighter leading-none">
+                        Premium
+                      </span>
                     </div>
+                    <div className="flex items-center gap-5">
+                      <Bell className="w-[21px] h-[21px] stroke-[1.8]" />
+                      <Search className="w-[21px] h-[21px] stroke-[1.8]" />
+                    </div>
+                  </div>
 
-                    <div className="px-3 flex items-start gap-3">
-                      <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 uppercase ${
-                          card.isUser
-                            ? 'bg-red-600 text-white'
-                            : isBright
-                            ? 'bg-neutral-200 text-neutral-800'
-                            : 'bg-neutral-800 text-neutral-200'
-                        }`}
-                      >
-                        {card.channel.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3
-                          className={`text-[14px] leading-[18px] font-medium line-clamp-2 ${ytTitleColor}`}
-                          style={{ maxWidth: '32ch' }}
+                  {/* Top Category Underline Navigation Tabs (No pills, red underline on active tab) */}
+                  <div className="px-4 pt-1 pb-3 flex items-center gap-5 overflow-hidden whitespace-nowrap">
+                    {['Principal', 'Suscripciones', 'Música', 'En tiempo real'].map(
+                      (tab, idx) => (
+                        <div
+                          key={tab}
+                          className={`relative pb-1.5 text-[14.5px] leading-tight shrink-0 ${
+                            idx === 0
+                              ? isBright
+                                ? 'font-semibold text-[#0f0f0f]'
+                                : 'font-medium text-white'
+                              : isBright
+                              ? 'font-normal text-[#444444]'
+                              : 'font-normal text-[#e5e5e5]'
+                          }`}
                         >
-                          {card.title}
-                        </h3>
-                        <div className={`text-[12px] leading-[16px] mt-1 truncate ${ytMetaColor}`}>
-                          {card.channel} · {card.views} · {card.timeAgo}
+                          <span>{tab}</span>
+                          {idx === 0 && (
+                            <span className="absolute left-0 right-0 bottom-0 h-[2.5px] rounded-full bg-[#FF0033]" />
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {/* Feed Viewport: 1st Full Video Card + 2nd Full Thumbnail Only (no title/channel/data) */}
+                  <div className="flex flex-col">
+                    {/* CARD 1: Complete Video Card (Full-bleed 16:9 thumb + Rounded bottom surface with full-width Title, @handle, views/time, & 4 Action Icons) */}
+                    {firstCard && (
+                      <div className={`rounded-b-[16px] overflow-hidden ${cardSurfaceBg}`}>
+                        {/* Full-bleed 16:9 Thumbnail */}
+                        <div className="relative aspect-video w-full bg-neutral-900 overflow-hidden">
+                          {renderThumbImg(firstCard)}
+                          <div className="absolute bottom-2 right-2 px-1.5 py-[2px] rounded-[5px] bg-black/75 text-white text-[11px] leading-[15px] font-semibold tabular-nums">
+                            {firstCard.duration}
+                          </div>
+                        </div>
+
+                        {/* Card 1 Footer Metadata + Quick Actions */}
+                        <div className="px-3.5 pt-3 pb-3.5">
+                          {/* Full-width Title (above avatar row, ~40 chars/line, 2 lines max) */}
+                          <h3
+                            className={`text-[15.5px] leading-[21px] font-medium line-clamp-2 break-words ${ytTitleColor}`}
+                          >
+                            {firstCard.title}
+                          </h3>
+
+                          {/* Bottom Row: Avatar + @handle / Views+Time on left, 4 Action Icons on right */}
+                          <div className="mt-2.5 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div
+                                className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 uppercase ${
+                                  firstCard.isUser
+                                    ? 'bg-red-600 text-white'
+                                    : isBright
+                                    ? 'bg-neutral-300 text-neutral-800'
+                                    : 'bg-neutral-700 text-neutral-100'
+                                }`}
+                              >
+                                {firstCard.channel.charAt(0)}
+                              </div>
+
+                              <div className="min-w-0">
+                                <div
+                                  className={`text-[13px] leading-[17px] truncate ${
+                                    isBright ? 'text-[#555555]' : 'text-[#aaaaaa]'
+                                  }`}
+                                >
+                                  {formatMobileHandle(firstCard.channel)}
+                                </div>
+                                <div
+                                  className={`text-[12.5px] leading-[17px] flex items-center gap-2 truncate mt-[1px] ${
+                                    isBright ? 'text-[#606060]' : 'text-[#9e9e9e]'
+                                  }`}
+                                >
+                                  <span className="inline-flex items-center gap-1 shrink-0">
+                                    <svg
+                                      viewBox="0 0 16 16"
+                                      className="w-3 h-3 fill-none stroke-current stroke-[1.5] shrink-0"
+                                    >
+                                      <polygon points="4,2.5 13,8 4,13.5" />
+                                    </svg>
+                                    <span className="tabular-nums">
+                                      {formatMobileViews(firstCard.views)}
+                                    </span>
+                                  </span>
+                                  <span className="shrink-0">
+                                    {formatMobileTime(firstCard.timeAgo)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 4 Quick Action Icons: Like, Comments, Save/Bookmark, Horizontal 3-dots */}
+                            <div
+                              className={`flex items-center gap-3.5 shrink-0 pl-1 ${ytTitleColor}`}
+                            >
+                              <ThumbsUp className="w-[18px] h-[18px] stroke-[1.7]" />
+                              {/* YouTube Comment Bubble with 2 lines */}
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-[18px] h-[18px] fill-none stroke-current stroke-[1.7]"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5H9.5L5 20.5V17h-.5A2.5 2.5 0 0 1 4 14.5v-9Z" />
+                                <line x1="8" y1="8.5" x2="16" y2="8.5" />
+                                <line x1="8" y1="12" x2="13.5" y2="12" />
+                              </svg>
+                              <Bookmark className="w-[18px] h-[18px] stroke-[1.7]" />
+                              {/* Horizontal 3 dots */}
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-[18px] h-[18px] fill-current"
+                              >
+                                <circle cx="5" cy="12" r="1.7" />
+                                <circle cx="12" cy="12" r="1.7" />
+                                <circle cx="19" cy="12" r="1.7" />
+                              </svg>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <MoreVertical className={`w-4 h-4 shrink-0 ${ytMetaColor}`} />
+                    )}
+
+                    {/* Clean Gap separating Card 1's rounded bottom from Card 2 */}
+                    <div className="h-3.5 w-full" />
+
+                    {/* CARD 2: Entire 16:9 Thumbnail + Duration Badge visible, cut off before Title/Channel/Data */}
+                    {secondCard && (
+                      <div className="flex flex-col">
+                        <div className="relative aspect-video w-full bg-neutral-900 overflow-hidden">
+                          {renderThumbImg(secondCard)}
+                          <div className="absolute bottom-2 right-2 px-1.5 py-[2px] rounded-[5px] bg-black/75 text-white text-[11px] leading-[15px] font-semibold tabular-nums">
+                            {secondCard.duration}
+                          </div>
+                        </div>
+                        {/* Subtle top sliver of Card 2's footer surface clipped right before title & metadata */}
+                        <div className={`h-[14px] w-full ${cardSurfaceBg}`} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile YouTube Icon-Only Bottom Navigation Bar (Home, Shorts, +, Profile Avatar) */}
+                  <div
+                    className={`h-12 px-2 grid grid-cols-4 items-center ${
+                      isBright ? 'bg-white text-[#0f0f0f]' : 'bg-[#0f0f0f] text-[#f1f1f1]'
+                    }`}
+                  >
+                    {/* Filled Home Icon */}
+                    <div className="flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="w-[22px] h-[22px] fill-current">
+                        <path d="M12 3.2 4 10v10a1 1 0 0 0 1 1h5v-6h4v6h5a1 1 0 0 0 1-1V10l-8-6.8Z" />
+                      </svg>
+                    </div>
+
+                    {/* Outline Shorts Icon */}
+                    <div className="flex items-center justify-center">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-[22px] h-[22px] fill-none stroke-current stroke-[1.7]"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M14.7 3.3a2.8 2.8 0 0 1 3.7 1.3 2.8 2.8 0 0 1-1.1 3.6l-1.2.7 1.3.7a2.8 2.8 0 0 1 1.1 3.7 2.8 2.8 0 0 1-1.2 1.1l-6.8 3.8a2.8 2.8 0 0 1-3.8-1.1 2.8 2.8 0 0 1 1.1-3.7l1.2-.7-1.3-.7a2.8 2.8 0 0 1-1.1-3.7c.2-.5.6-.9 1.1-1.1l7-3.8Z" />
+                        <polygon
+                          points="10.2,9.2 15.2,12 10.2,14.8"
+                          className="fill-current stroke-none"
+                        />
+                      </svg>
+                    </div>
+
+                    {/* Outline Create (+) Circle Icon */}
+                    <div className="flex items-center justify-center">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="w-[23px] h-[23px] fill-none stroke-current stroke-[1.7]"
+                        strokeLinecap="round"
+                      >
+                        <circle cx="12" cy="12" r="9.2" />
+                        <line x1="12" y1="7.8" x2="12" y2="16.2" />
+                        <line x1="7.8" y1="12" x2="16.2" y2="12" />
+                      </svg>
+                    </div>
+
+                    {/* Profile Avatar Circle */}
+                    <div className="flex items-center justify-center">
+                      <div className="w-[25px] h-[25px] rounded-full bg-[#7e57c2] text-white text-[12px] font-semibold flex items-center justify-center uppercase">
+                        {effectiveChannel.charAt(0)}
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              {/* Mobile Bottom Tab Bar */}
-              <div className={`h-12 border-t grid grid-cols-4 items-center text-[10px] ${ytBorder}`}>
-                <div className="flex flex-col items-center gap-0.5">
-                  <Home className="w-4 h-4" />
-                  <span>Principal</span>
+                  {/* Android 3-Button System Navigation Bar (Recents |||, Home □, Back <) */}
+                  <div
+                    className={`h-9 px-16 flex items-center justify-between ${
+                      isBright
+                        ? 'bg-white text-[#555555]'
+                        : 'bg-[#0f0f0f] text-[#b3b3b3]'
+                    }`}
+                  >
+                    {/* Recents (3 vertical bars) */}
+                    <div className="flex items-center gap-[3.5px]">
+                      <span className="w-[1.8px] h-3.5 rounded-full bg-current" />
+                      <span className="w-[1.8px] h-3.5 rounded-full bg-current" />
+                      <span className="w-[1.8px] h-3.5 rounded-full bg-current" />
+                    </div>
+                    {/* Home (rounded square outline) */}
+                    <span className="w-[14px] h-[14px] rounded-[4.5px] border-[1.8px] border-current" />
+                    {/* Back chevron (<) */}
+                    <svg
+                      viewBox="0 0 16 16"
+                      className="w-4 h-4 fill-none stroke-current stroke-[1.8]"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="10.5,3.5 5.5,8 10.5,12.5" />
+                    </svg>
+                  </div>
                 </div>
-                <div className={`flex flex-col items-center gap-0.5 ${ytMetaColor}`}>
-                  <Compass className="w-4 h-4" />
-                  <span>Shorts</span>
-                </div>
-                <div className={`flex flex-col items-center gap-0.5 ${ytMetaColor}`}>
-                  <PlaySquare className="w-4 h-4" />
-                  <span>Suscripciones</span>
-                </div>
-                <div className={`flex flex-col items-center gap-0.5 ${ytMetaColor}`}>
-                  <User className="w-4 h-4" />
-                  <span>Tú</span>
-                </div>
-              </div>
-            </>
+              );
+            })()
           ) : (
             /* MOBILE WATCH PAGE ("Sidebar" / Viendo un video - Exact 1:1 match to attached screenshot) */
             <div className="flex flex-col">
